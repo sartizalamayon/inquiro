@@ -1,13 +1,8 @@
-import type { Metadata } from "next";
+"use client";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
-
-
-export const metadata: Metadata = {
-  title: "inquiro",
-  description: "AI powered research assistant",
-};
+import { SessionProvider } from "next-auth/react";
 
 export default function RootLayout({
   children,
@@ -25,7 +20,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
         >
-            {children}
+          <SessionProvider>
+          {children}
+          </SessionProvider>
         </ThemeProvider>
         <Toaster />
       </body>
