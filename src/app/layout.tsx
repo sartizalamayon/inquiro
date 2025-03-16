@@ -1,8 +1,8 @@
 "use client";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "@/components/theme-provider";
 
 export default function RootLayout({
   children,
@@ -11,19 +11,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`antialiased`}
-      >
-        <ThemeProvider
+      <head />
+      <body className="antialiased">
+        <SessionProvider>
+          <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
-        >
-          <SessionProvider>
-          {children}
-          </SessionProvider>
-        </ThemeProvider>
+            storageKey="app-theme"
+          >
+            {children}
+          </ThemeProvider>
+        </SessionProvider>
         <Toaster />
       </body>
     </html>

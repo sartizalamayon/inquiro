@@ -1,61 +1,80 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuthForm } from "@/components/auth-form";
+import { toast } from "sonner";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
     
-    const res = await fetch("http://localhost:8000/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name, password }),
-    });
+    try {
+      const res = await fetch("http://localhost:8000/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email, 
+          name, 
+          password 
+        }),
+      });
 
-    if (res.ok) {
-      router.push("/auth/signin");
-    } else {
-      alert("Failed to sign up");
+      if (res.ok) {
+        // Show success toast before redirecting
+        toast.success("Account created successfully. Please sign in.");
+        
+        // Delay redirect slightly to ensure toast is visible
+        setTimeout(() => {
+          router.push("/signin");
+        }, 300);
+      } else {
+        // Handle different error types
+        try {
+          const errorData = await res.json();
+          if (res.status === 409) {
+            setError("This email is already registered. Please sign in instead.");
+          } else if (errorData.detail && errorData.detail.includes("validation error")) {
+            // Format validation errors to be more user-friendly
+            setError("Invalid data provided. Please check your information and try again.");
+            console.error("Validation error:", errorData.detail);
+          } else {
+            setError(errorData.detail || "Failed to create account. Please try again.");
+          }
+        } catch (parseErr) {
+          setError("Failed to create account. Please try again.");
+        }
+      }
+    } catch (err) {
+      setError("An error occurred. Please check your connection and try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <h2 className="text-2xl mb-4">Sign Up</h2>
-      <form onSubmit={handleSignUp} className="flex flex-col gap-4">
-        <input
-          type="text"
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="border p-2 rounded"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="border p-2 rounded"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="border p-2 rounded"
-        />
-        <button type="submit" className="bg-green-500 text-white p-2 rounded">
-          Sign Up
-        </button>
-      </form>
+    <div className="flex items-center justify-center h-screen">
+      <AuthForm 
+        isLogin={false}
+        handleFunction={handleSignUp}
+        email={email}
+        setEmail={setEmail}
+        name={name}
+        setName={setName}
+        password={password}
+        setPassword={setPassword}
+        isLoading={isLoading}
+        error={error}
+      />
     </div>
   );
 }
