@@ -12,8 +12,98 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuGroup, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
 
-import { FileText, Plus, Search, Clock, MoreHorizontal, Loader2, CheckCircle, AlertCircle } from "lucide-react"
+import { 
+  FileText, Plus, Search, Clock, MoreHorizontal, Loader2, 
+  CheckCircle, AlertCircle, Trash2, FolderPlus
+} from "lucide-react"
+
+// Custom dialog component
+const DeleteConfirmDialog = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  title: string;
+}) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-background border rounded-lg shadow-lg w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <h3 className="text-lg font-medium">
+            Delete Paper
+          </h3>
+          <p className="mt-2 text-muted-foreground">
+            Are you sure you want to delete {title === "Processing Error" ? "this failed paper" : `"${title}"`}?
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 p-4 bg-muted/40 border-t">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onConfirm}>
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Paper type definition
+interface Author {
+  name: string;
+  affiliation: string;
+  email: string;
+}
+
+interface PaperMetadata {
+  doi: string;
+  conference: string;
+  tags: string[];
+}
+
+interface PaperSummary {
+  research_problem: string;
+  objective: string;
+  key_findings: string;
+  methods: string;
+  numbers: string;
+  dataset: string;
+  baseline_comparisons: string;
+  limitations: string;
+  future_work: string;
+  novelty_statement: string;
+  user_given_fields: Array<{
+    field_name: string;
+    value: string;
+  }>
+}
+
+interface Paper {
+  _id: string;
+  title: string;
+  authors: Author[];
+  date_published: string;
+  metadata: PaperMetadata;
+  summary: PaperSummary;
+  references: string[];
+  user_email: string;
+  created_at: string;
+}
 
 export default function PapersPage() {
   // Grab user email from NextAuth (no checks, just use it)
@@ -26,6 +116,10 @@ export default function PapersPage() {
   // Add upload progress state
   const [uploadStage, setUploadStage] = useState<"idle" | "uploading" | "processing" | "completed" | "error">("idle")
   const [uploadProgress, setUploadProgress] = useState(0)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [paperToDelete, setPaperToDelete] = useState<{paperId: string, title: string} | null>(null)
 
   // File input ref
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -73,7 +167,7 @@ export default function PapersPage() {
             if (errorData && errorData.detail) {
               errorMessage = errorData.detail;
             }
-          } catch (jsonError) {
+          } catch {
             // If we can't parse the error response as JSON, use status text
             errorMessage = res.statusText || "Server error occurred";
           }
@@ -103,6 +197,10 @@ export default function PapersPage() {
         // Reset the upload state after a short delay
         setUploadStage("idle")
         setUploadProgress(0)
+        // Reset the file input to allow uploading the same file again
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
         refetch()
       }, 1500)
     },
@@ -110,6 +208,33 @@ export default function PapersPage() {
       console.error("Error uploading file:", err)
       toast.error("Failed to process paper. Please try again.")
       setUploadStage("error")
+      // Reset the file input to allow trying again with the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    },
+  })
+
+  // 3) Mutation for deleting papers
+  const { mutate: deletePaper } = useMutation({
+    mutationFn: async ({ paperId, email }: { paperId: string, email: string }) => {
+      const res = await fetch(`http://localhost:8000/paper/${paperId}?email=${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      })
+      
+      if (!res.ok) {
+        throw new Error("Failed to delete paper")
+      }
+      
+      return res.json()
+    },
+    onSuccess: () => {
+      toast.success("Paper removed successfully")
+      refetch()
+    },
+    onError: (err) => {
+      console.error("Error deleting paper:", err)
+      toast.error("Failed to remove paper")
     },
   })
 
@@ -168,6 +293,23 @@ export default function PapersPage() {
   // 4) Render the page
   return (
     <DashboardLayout>
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={() => {
+          if (paperToDelete) {
+            deletePaper({
+              paperId: paperToDelete.paperId,
+              email: userEmail
+            });
+            setDeleteDialogOpen(false);
+            setPaperToDelete(null);
+          }
+        }}
+        title={paperToDelete?.title || ""}
+      />
+      
       <div className="flex flex-col gap-6">
         {/* Title & subtitle */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -192,7 +334,7 @@ export default function PapersPage() {
         {/* Papers grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Upload New Paper Card */}
-          <Card className="flex flex-col items-center justify-center border-dashed p-6 hover:border-primary/50 hover:bg-muted/50 transition-colors">
+          <Card className="flex flex-col min-h-[250px] items-center justify-center border-dashed p-6 hover:border-primary/50 hover:bg-muted/50 transition-colors">
             <input
               type="file"
               accept="application/pdf"
@@ -200,17 +342,17 @@ export default function PapersPage() {
               onChange={handleFileChange}
               style={{ display: "none" }}
             />
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-              <Plus className="h-10 w-10 text-primary" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+              <Plus className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="mt-4 text-lg font-medium">Upload New Paper</h3>
-            <p className="mt-1 text-center text-sm text-muted-foreground">
+            <h3 className="text-lg font-medium text-center">Upload New Paper</h3>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
               Upload a PDF to get an AI-generated summary
             </p>
             
             {/* Processing status */}
             {uploadStage !== "idle" && (
-              <div className="w-full mt-4 space-y-2">
+              <div className="w-full mt-6 space-y-2">
                 <div className="flex justify-between text-xs">
                   <span>{uploadStage === "uploading" ? "Uploading..." : "Processing..."}</span>
                   <span>{uploadProgress}%</span>
@@ -220,7 +362,7 @@ export default function PapersPage() {
             )}
             
             <Button
-              className="mt-4"
+              className="mt-6"
               onClick={handleUploadClick}
               disabled={uploadStage !== "idle" && uploadStage !== "error"}
             >
@@ -246,46 +388,98 @@ export default function PapersPage() {
             </div>
           ) : (
             // Render the list of papers
-            papers.map((paper: any, i: number) => {
+            papers.map((paper: Paper, i: number) => {
               const authors =
-                paper.authors?.map((a: any) => a.name).join(", ") || "No authors"
+                paper.authors?.map((a: Author) => a.name).join(", ") || "No authors"
               const dateText = paper.created_at
                 ? new Date(paper.created_at).toLocaleDateString()
                 : "Unknown date"
               const tags = paper.metadata?.tags || []
-
+              
+              // Check if this is an error paper
+              const isErrorPaper = paper.title === "Error Processing Document" || 
+                                  paper.title === "Processing Error" ||
+                                  paper.title === "Parsing Error - Please try again"
+              
               return (
                 <Card
                   key={i}
-                  className="flex flex-col h-full transition-all hover:shadow-md"
+                  className={`flex flex-col min-h-[250px] transition-all hover:shadow-md ${isErrorPaper ? 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30' : ''}`}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                        <CardTitle className="text-lg">
-                          {paper.title || "Untitled Paper"}
-                        </CardTitle>
+                  <CardHeader className="pb-3 flex-shrink-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 w-full overflow-hidden">
+                        <div className="flex-shrink-0 mt-1">
+                          {isErrorPaper ? (
+                            <AlertCircle className="h-5 w-5 text-red-500" />
+                          ) : (
+                            <FileText className="h-5 w-5 text-primary" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <CardTitle className={`text-base font-semibold line-clamp-2 break-words ${isErrorPaper ? 'text-red-600 dark:text-red-400' : ''}`}>
+                            {isErrorPaper ? "Processing Error" : (paper.title || "Untitled Paper")}
+                          </CardTitle>
+                          <CardDescription className="line-clamp-1 mt-1 text-sm">
+                            {isErrorPaper ? "Error occurred during processing" : `Authors: ${authors}`}
+                          </CardDescription>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">More options</span>
-                      </Button>
+                      
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 mt-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">More options</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem 
+                              disabled={isErrorPaper}
+                              onClick={() => toast.info("Add to collection feature coming soon")}>
+                              <FolderPlus className="mr-2 h-4 w-4" />
+                              <span>Add to Collection</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              variant="destructive"
+                              onClick={() => {
+                                setPaperToDelete({
+                                  paperId: paper._id,
+                                  title: paper.title
+                                });
+                                setDeleteDialogOpen(true);
+                              }}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <CardDescription className="line-clamp-1">
-                      Authors: {authors}
-                    </CardDescription>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {tags.map((tag: string, j: number) => (
-                        <Badge key={j} variant="secondary" className="text-xs">
-                          {tag}
+                    
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {isErrorPaper ? (
+                        <Badge variant="destructive" className="text-xs">Failed</Badge>
+                      ) : (
+                        tags.slice(0, 2).map((tag: string, j: number) => (
+                          <Badge key={j} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))
+                      )}
+                      {!isErrorPaper && tags.length > 2 && (
+                        <Badge variant="outline" className="text-xs font-normal">
+                          +{tags.length - 2} more
                         </Badge>
-                      ))}
+                      )}
                     </div>
                   </CardHeader>
-                  <CardContent className="flex-1">
-                    <p className="line-clamp-3 text-sm text-muted-foreground">
-                      {paper.summary?.research_problem || "No excerpt available."}
+                  <CardContent className="pt-0 pb-4 flex-1">
+                    <p className={`text-sm ${isErrorPaper ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      {isErrorPaper 
+                        ? (paper.summary?.research_problem || "An error occurred while processing this document. Please try again with a different document.") 
+                        : (paper.summary?.research_problem || "No excerpt available.")}
                     </p>
                   </CardContent>
                   <CardFooter className="flex justify-between border-t pt-3">
@@ -293,8 +487,23 @@ export default function PapersPage() {
                       <Clock className="mr-1 h-3 w-3" />
                       <span>{dateText}</span>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      View
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        if (isErrorPaper) {
+                          setPaperToDelete({
+                            paperId: paper._id,
+                            title: "Processing Error"
+                          });
+                          setDeleteDialogOpen(true);
+                        } else {
+                          // View functionality will be added later
+                          toast.info("View functionality coming soon");
+                        }
+                      }}
+                    >
+                      {isErrorPaper ? "Remove" : "View"}
                     </Button>
                   </CardFooter>
                 </Card>
