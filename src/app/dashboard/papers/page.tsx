@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useMutation } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { usePapers } from "@/hooks/usePaper" 
 import { DashboardLayout } from "@/components/dashboard/layout"
@@ -10,8 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 
-import { FileText, Plus, Search, Clock, MoreHorizontal, Loader2 } from "lucide-react"
+import { FileText, Plus, Search, Clock, MoreHorizontal, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 
 export default function PapersPage() {
   // Grab user email from NextAuth (no checks, just use it)
@@ -20,6 +22,10 @@ export default function PapersPage() {
 
   // Local state for search input
   const [searchValue, setSearchValue] = useState("")
+  
+  // Add upload progress state
+  const [uploadStage, setUploadStage] = useState<"idle" | "uploading" | "processing" | "completed" | "error">("idle")
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   // File input ref
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -34,24 +40,76 @@ export default function PapersPage() {
   } = usePapers(userEmail, searchValue)
 
   // 2) Mutation for uploading PDFs
-  const { mutate: uploadPdf, isLoading: isUploading } = useMutation({
+  const { mutate: uploadPdf } = useMutation({
     mutationFn: async (formData: FormData) => {
-      // POST to your FastAPI endpoint
-      const res = await fetch("http://localhost:8000/paper/extract-pdf", {
-        method: "POST",
-        body: formData,
-      })
-      if (!res.ok) {
-        throw new Error("Upload failed")
+      try {
+        setUploadStage("uploading")
+        setUploadProgress(15)
+        toast.info("Starting paper upload and processing")
+        
+        // Simulate progress during upload
+        const progressInterval = setInterval(() => {
+          setUploadProgress((prev) => {
+            // Progress to 75% during processing, final 25% when complete
+            if (prev < 75) return prev + 3
+            return prev
+          })
+        }, 1000)
+        
+        // POST to your FastAPI endpoint
+        const res = await fetch("http://localhost:8000/paper/extract-pdf", {
+          method: "POST",
+          body: formData,
+        })
+        
+        if (!res.ok) {
+          clearInterval(progressInterval)
+          setUploadStage("error")
+          
+          // Attempt to get the error message from the response
+          let errorMessage = "Upload failed";
+          try {
+            const errorData = await res.json();
+            if (errorData && errorData.detail) {
+              errorMessage = errorData.detail;
+            }
+          } catch (jsonError) {
+            // If we can't parse the error response as JSON, use status text
+            errorMessage = res.statusText || "Server error occurred";
+          }
+          
+          throw new Error(errorMessage);
+        }
+        
+        setUploadStage("processing")
+        const data = await res.json()
+        
+        // Complete the progress animation
+        setUploadProgress(100)
+        setUploadStage("completed")
+        clearInterval(progressInterval)
+        
+        return data
+      } catch (err) {
+        setUploadStage("error")
+        setUploadProgress(0)
+        throw err
       }
-      return res.json()
     },
     onSuccess: () => {
       // Refetch papers to see the newly uploaded one
-      refetch()
+      toast.success("Paper processed successfully")
+      setTimeout(() => {
+        // Reset the upload state after a short delay
+        setUploadStage("idle")
+        setUploadProgress(0)
+        refetch()
+      }, 1500)
     },
     onError: (err) => {
       console.error("Error uploading file:", err)
+      toast.error("Failed to process paper. Please try again.")
+      setUploadStage("error")
     },
   })
 
@@ -69,6 +127,42 @@ export default function PapersPage() {
 
   const handleUploadClick = () => {
     fileInputRef.current?.click()
+  }
+
+  // Get upload status content
+  const getUploadStatusContent = () => {
+    switch (uploadStage) {
+      case "uploading":
+        return (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <span>Uploading paper...</span>
+          </>
+        )
+      case "processing":
+        return (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <span>Analyzing content...</span>
+          </>
+        )
+      case "completed":
+        return (
+          <>
+            <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+            <span>Processing complete!</span>
+          </>
+        )
+      case "error":
+        return (
+          <>
+            <AlertCircle className="mr-2 h-4 w-4 text-red-500" />
+            <span>Processing failed</span>
+          </>
+        )
+      default:
+        return "Upload PDF"
+    }
   }
 
   // 4) Render the page
@@ -113,27 +207,27 @@ export default function PapersPage() {
             <p className="mt-1 text-center text-sm text-muted-foreground">
               Upload a PDF to get an AI-generated summary
             </p>
+            
+            {/* Processing status */}
+            {uploadStage !== "idle" && (
+              <div className="w-full mt-4 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>{uploadStage === "uploading" ? "Uploading..." : "Processing..."}</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-1.5" />
+              </div>
+            )}
+            
             <Button
               className="mt-4"
               onClick={handleUploadClick}
-              disabled={isUploading}
+              disabled={uploadStage !== "idle" && uploadStage !== "error"}
             >
-              {isUploading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Uploading...</span>
-                </div>
-              ) : (
-                "Upload PDF"
-              )}
+              <div className="flex items-center gap-2">
+                {getUploadStatusContent()}
+              </div>
             </Button>
-            {/* If uploading, you can show a small spinner */}
-            {isUploading && (
-              <CardContent className="mt-4 flex items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                <span>Summarizing...</span>
-              </CardContent>
-            )}
           </Card>
 
           {/* Handling states: loading, error, empty data, or normal list */}
