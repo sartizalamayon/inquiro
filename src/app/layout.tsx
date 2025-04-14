@@ -1,18 +1,16 @@
 "use client"
-
 import type React from "react"
-
 import "@/app/globals.css"
-import { Toaster } from "sonner" // Changed import path from "@/components/ui/sonner" to "sonner"
+import { Toaster } from "sonner"
 import { SessionProvider } from "next-auth/react"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Navbar } from "@/components/navbar"
 import { Inter } from "next/font/google"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 
 const inter = Inter({ subsets: ["latin"] })
 
-// Note: metadata can't be used with 'use client' directive
-// If you need metadata, consider moving it to a separate file or using a different approach
+const queryClient = new QueryClient();
 
 export default function RootLayout({
   children,
@@ -35,7 +33,10 @@ export default function RootLayout({
             enableColorScheme
             storageKey="app-theme"
           >
+            <QueryClientProvider client={queryClient}>
             <main>{children}</main>
+            </QueryClientProvider>
+            
             
           </ThemeProvider>
         </SessionProvider>
