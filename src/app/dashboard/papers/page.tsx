@@ -22,7 +22,7 @@ import {
 
 import { 
   FileText, Plus, Search, Clock, MoreHorizontal, Loader2, 
-  CheckCircle, AlertCircle, Trash2, FolderPlus
+  CheckCircle, AlertCircle, Trash2, FolderPlus, X, SlidersHorizontal
 } from "lucide-react"
 
 // Custom dialog component
@@ -56,6 +56,137 @@ const DeleteConfirmDialog = ({
           </Button>
           <Button variant="destructive" size="sm" onClick={onConfirm}>
             Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Fields Manager component
+const FieldsManager = ({ 
+  fields, 
+  setFields,
+  isOpen,
+  setIsOpen
+}: { 
+  fields: string[];
+  setFields: React.Dispatch<React.SetStateAction<string[]>>;
+  isOpen: boolean;
+  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}) => {
+  const [newField, setNewField] = useState("")
+  
+  const handleAddField = () => {
+    if (!newField.trim()) return
+    
+    setFields(prev => [...prev, newField.trim()])
+    setNewField("")
+  }
+  
+  const handleRemoveField = (index: number) => {
+    setFields(fields.filter((_, i) => i !== index))
+  }
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-background border rounded-lg shadow-lg w-full max-w-2xl overflow-hidden">
+        <div className="p-6">
+          <h3 className="text-lg font-medium">
+            Custom Summary Fields
+          </h3>
+          
+          <div className="mt-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Standard fields like Research Problem, Methodology, and Key Findings are included by default.
+                  Add custom fields below that are important for your research.
+                </p>
+                
+                <div className="p-3 bg-muted rounded-md mt-3 space-y-2">
+                  <h4 className="text-sm font-medium">Standard fields included:</h4>
+                  <div className="space-y-2 text-sm max-h-[180px] overflow-y-auto pr-2">
+                    <div>
+                      <span className="font-medium">Research Problem:</span> The core challenge or question the paper aims to address.
+                    </div>
+                    <div>
+                      <span className="font-medium">Objective:</span> The specific goals and aims of the research.
+                    </div>
+                    <div>
+                      <span className="font-medium">Key Findings:</span> The main results and discoveries reported in the paper.
+                    </div>
+                    <div>
+                      <span className="font-medium">Methods:</span> The techniques, approaches, or methodologies used in the research.
+                    </div>
+                    <div>
+                      <span className="font-medium">Numbers:</span> Key statistics, measurements, or numerical results from the paper.
+                    </div>
+                    <div>
+                      <span className="font-medium">Dataset:</span> Information about the data used in the research.
+                    </div>
+                    <div>
+                      <span className="font-medium">Baseline Comparisons:</span> How the research compares to existing approaches or baselines.
+                    </div>
+                    <div>
+                      <span className="font-medium">Limitations:</span> Constraints, weaknesses, or boundaries of the research.
+                    </div>
+                    <div>
+                      <span className="font-medium">Future Work:</span> Potential directions for continued research or development.
+                    </div>
+                    <div>
+                      <span className="font-medium">Novelty Statement:</span> What makes this research new, unique, or innovative.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Input 
+                  type="text" 
+                  placeholder="Add a custom field (e.g., Industry Impact)"
+                  value={newField}
+                  onChange={(e) => setNewField(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddField();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={handleAddField}>Add</Button>
+              </div>
+              
+              {fields.length > 0 ? (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">Your custom fields:</h3>
+                  <div className="space-y-2">
+                    {fields.map((field, index) => (
+                      <div key={index} className="flex items-center justify-between border rounded-md p-2">
+                        <span>{field}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleRemoveField(index)}
+                        >
+                          <X className="h-4 w-4" />
+                          <span className="sr-only">Remove</span>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No custom fields added yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 p-4 bg-muted/40 border-t">
+          <Button size="sm" onClick={() => setIsOpen(false)}>
+            Done
           </Button>
         </div>
       </div>
@@ -123,6 +254,10 @@ export default function PapersPage() {
 
   // File input ref
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Custom fields state
+  const [customFields, setCustomFields] = useState<string[]>([])
+  const [fieldsModalOpen, setFieldsModalOpen] = useState(false)
 
   // 1) Use the custom hook to fetch papers
   const {
@@ -246,6 +381,11 @@ export default function PapersPage() {
     const formData = new FormData()
     formData.append("pdf", file)
     formData.append("email", userEmail)
+    
+    // Include custom fields in the request
+    if (customFields.length > 0) {
+      formData.append("fields", JSON.stringify(customFields))
+    }
 
     uploadPdf(formData)
   }
@@ -293,6 +433,14 @@ export default function PapersPage() {
   // 4) Render the page
   return (
     <DashboardLayout>
+      {/* Fields manager modal */}
+      <FieldsManager
+        fields={customFields}
+        setFields={setCustomFields}
+        isOpen={fieldsModalOpen}
+        setIsOpen={setFieldsModalOpen}
+      />
+      
       {/* Delete confirmation dialog */}
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}
@@ -319,16 +467,27 @@ export default function PapersPage() {
           </div>
         </div>
 
-        {/* Only a search input (no filters) */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search papers..."
-            className="pl-8"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-          />
+        {/* Search and Fields controls in a single row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search papers..."
+              className="pl-8"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+            />
+          </div>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setFieldsModalOpen(true)}
+            className="self-start sm:self-auto"
+          >
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            <span className="text-primary font-medium">Fields</span>
+          </Button>
         </div>
 
         {/* Papers grid */}
