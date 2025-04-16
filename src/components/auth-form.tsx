@@ -1,3 +1,5 @@
+'use client'
+
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,6 +14,9 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useSession, signIn } from "next-auth/react";
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { useEffect } from "react"
 
 export function AuthForm({
   isLogin,
@@ -26,12 +31,16 @@ export function AuthForm({
   error = "",
 }) {
   const { data: session } = useSession();
+  const router = useRouter();
 
   // Do not use redirect here - let the page component handle it
   // This avoids React hooks rendering issues
-  if (session) {
-    return null;
-  }
+  useEffect(() => {
+    if (session) {
+      toast.success("Already logged in");
+      router.push("/dashboard");
+    }
+  }, [session, router]);
   
   // Define OAuth sign-in handlers
   const handleGithubSignIn = () => {

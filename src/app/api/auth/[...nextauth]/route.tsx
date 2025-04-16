@@ -130,7 +130,6 @@ const handler = NextAuth({
     signIn: "/signin",
     error: "/auth/error",
   },
-  debug: process.env.NODE_ENV === "development",
 });
 
 export { handler as GET, handler as POST };

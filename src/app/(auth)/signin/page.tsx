@@ -11,7 +11,6 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
-  const router = useRouter();
   const searchParams = useSearchParams();
   
   // Check for success message on component mount

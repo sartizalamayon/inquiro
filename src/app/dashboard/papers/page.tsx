@@ -4,8 +4,7 @@ import { useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
-
-import { usePapers } from "@/hooks/usePaper" 
+import { usePapers } from "@/hooks/usePapers" 
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +23,7 @@ import {
   FileText, Plus, Search, Clock, MoreHorizontal, Loader2, 
   CheckCircle, AlertCircle, Trash2, FolderPlus, X, SlidersHorizontal
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 // Custom dialog component
 const DeleteConfirmDialog = ({ 
@@ -89,6 +89,7 @@ const FieldsManager = ({
   }
   
   if (!isOpen) return null;
+
   
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -237,6 +238,7 @@ interface Paper {
 }
 
 export default function PapersPage() {
+  const router = useRouter()
   // Grab user email from NextAuth (no checks, just use it)
   const { data: session } = useSession()
   const userEmail = session?.user?.email || ""
@@ -657,8 +659,7 @@ export default function PapersPage() {
                           });
                           setDeleteDialogOpen(true);
                         } else {
-                          // View functionality will be added later
-                          toast.info("View functionality coming soon");
+                          router.push(`/dashboard/paper/${paper._id}`)
                         }
                       }}
                     >
