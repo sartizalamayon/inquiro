@@ -8,11 +8,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Eye, Bookmark, Sun, Moon, User } from "lucide-react";
+import { ArrowLeft, Edit, Eye, Bookmark, Sun, Moon, User, Save } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import SectionEditor from "./SectionEditor";
+import Image from "next/image";
 // Type definition for a paper object
 interface Author {
   name: string;
@@ -52,14 +53,75 @@ interface Note {
 }
 
 const PaperPage = ({ paperId }: { paperId: string }) => {
-  const { data: paper, isLoading, isError } = usePaper(paperId);
+  const { data: paper, isLoading, isError, refetch } = usePaper(paperId);
   const [isEditMode, setIsEditMode] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNote, setActiveNote] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
+  const [updatedContent, setUpdatedContent] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { theme, setTheme } = useTheme();
   const { data: session } = useSession();
+
+  // Handle section content update
+  const handleContentUpdate = useCallback((sectionId: string, content: string) => {
+    setUpdatedContent(prev => ({
+      ...prev,
+      [sectionId]: content
+    }));
+  }, []);
+
+  // Save all changes to backend
+  const saveChanges = useCallback(async () => {
+    if (Object.keys(updatedContent).length === 0) return;
+    
+    try {
+      setIsSaving(true);
+      setSaveSuccess(false);
+      
+      // The backend now handles both formats, so we can send it wrapped
+      const response = await fetch(`http://localhost:8000/paper/${paperId}/update`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sections: updatedContent }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Server error:', errorData);
+        throw new Error(`Failed to save changes: ${response.status}`);
+      }
+      
+      // Clear the updatedContent after successful save
+      setUpdatedContent({});
+      setSaveSuccess(true);
+      
+      // Refetch the paper data to get the latest version
+      await refetch();
+      
+      // Show success message temporarily
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error saving changes:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [updatedContent, paperId, refetch]);
+
+  // Toggle edit mode and save changes if needed
+  const toggleEditMode = useCallback(async () => {
+    if (isEditMode && Object.keys(updatedContent).length > 0) {
+      // Save changes when switching from edit to view mode
+      await saveChanges();
+    }
+    setIsEditMode(prev => !prev);
+  }, [isEditMode, updatedContent, saveChanges]);
 
   // Create a function to handle adding or updating a note
   const saveNote = useCallback(() => {
@@ -127,9 +189,6 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
     return notes.some(note => note.sectionId === sectionId);
   }, [notes]);
 
-  // Toggle edit mode
-  const toggleEditMode = () => setIsEditMode(prev => !prev);
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -163,6 +222,33 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            {isEditMode && Object.keys(updatedContent).length > 0 && (
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={saveChanges}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <div className="flex items-center">
+                    <div className="h-4 w-4 border-2 border-current border-t-transparent animate-spin rounded-full mr-2"></div>
+                    Saving...
+                  </div>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            )}
+            
+            {saveSuccess && (
+              <span className="text-sm text-green-600 dark:text-green-500 animate-fade-in-out">
+                Changes saved!
+              </span>
+            )}
+            
             <Button variant="outline" size="sm">
               <Bookmark className="h-4 w-4 mr-2" />
               Save
@@ -171,6 +257,7 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
               variant={isEditMode ? "secondary" : "outline"} 
               size="sm"
               onClick={toggleEditMode}
+              disabled={isSaving}
             >
               {isEditMode ? (
                 <>
@@ -197,11 +284,10 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
             </Button>
             <Avatar>
               <div className="Avatar-image">
-                <img src={session?.user?.image || undefined} alt="User" />
+                <img src={session?.user?.image || undefined} alt="User" className="rounded-full w-8 h-8"/>
+                
               </div>
-              <div className="Avatar-fallback">
-                {session?.user?.name?.[0] || <User className="h-4 w-4" />}
-              </div>
+              
             </Avatar>
           </div>
         </div>
@@ -297,9 +383,10 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
                     </h2>
                     <Card className="p-6">
                       <SectionEditor
-                        content={value}
+                        content={value as string}
                         isEditable={isEditMode}
                         sectionId={key}
+                        onUpdate={(content) => handleContentUpdate(key, content)}
                       />
                     </Card>
                   </section>
@@ -322,6 +409,7 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
                       content={field.value}
                       isEditable={isEditMode}
                       sectionId={`user_field_${field.field_name}`}
+                      onUpdate={(content) => handleContentUpdate(`user_field_${field.field_name}`, content)}
                     />
                   </Card>
                 </section>
