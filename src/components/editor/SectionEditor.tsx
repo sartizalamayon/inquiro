@@ -2,14 +2,14 @@
 
 import { useEditor, EditorContent, Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Bold, Italic, List, ListOrdered, Code, Heading1, Heading2, Strikethrough } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Code, Strikethrough, Link as LinkIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface SectionEditorProps {
   content: string
   isEditable: boolean
-  sectionId: string
   onUpdate?: (content: string) => void
 }
 
@@ -23,26 +23,47 @@ const parseHTML = (html: string) => {
   }
 }
 
-const SectionEditor = ({ content, isEditable, sectionId, onUpdate }: SectionEditorProps) => {
+const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) => {
   const editorRef = useRef<Editor | null>(null)
   const [isFocused, setIsFocused] = useState(false)
-  const [initialSetupDone, setInitialSetupDone] = useState(false)
+  const [initialContent] = useState(() => parseHTML(content))
+  const [debouncedUpdate, setDebouncedUpdate] = useState<NodeJS.Timeout | null>(null)
+  
+  // Create custom link extension
+  const CustomLink = Link.configure({
+    openOnClick: false,
+    HTMLAttributes: {
+      class: 'text-blue-500 underline cursor-pointer',
+      target: '_blank',
+      rel: 'noopener noreferrer'
+    },
+  })
   
   const editor = useEditor({
     extensions: [
-      StarterKit
+      StarterKit.configure({
+        heading: {
+          levels: [3, 4] // Only allow h3 and h4
+        },
+      }),
+      CustomLink
     ],
-    content: parseHTML(content),
+    content: initialContent,
     editable: isEditable,
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML()
-      onUpdate?.(html)
+      // Debounce the update to prevent too many saves
+      if (debouncedUpdate) clearTimeout(debouncedUpdate)
+      const timeout = setTimeout(() => {
+        const html = editor.getHTML()
+        onUpdate?.(html)
+      }, 500) // Wait 500ms before updating
+      setDebouncedUpdate(timeout)
     },
     onFocus: () => setIsFocused(true),
     onBlur: () => setIsFocused(false),
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-[100px] prose prose-sm md:prose-base max-w-none dark:prose-invert p-2 rounded-md',
+        class: 'focus:outline-none min-h-[100px] prose prose-sm md:prose-base max-w-none dark:prose-invert p-2 rounded-md prose-pre:whitespace-pre-wrap prose-pre:break-words',
         spellcheck: 'true',
       }
     }
@@ -53,24 +74,22 @@ const SectionEditor = ({ content, isEditable, sectionId, onUpdate }: SectionEdit
     if (editor) {
       editorRef.current = editor
     }
-  }, [editor])
+    
+    // Clean up debounce on unmount
+    return () => {
+      if (debouncedUpdate) clearTimeout(debouncedUpdate)
+    }
+  }, [editor, debouncedUpdate])
 
   // Handle changes to editable state
   useEffect(() => {
     if (editor) {
       editor.setEditable(isEditable)
-      
-      // Focus the editor when it becomes editable
-      if (isEditable && !initialSetupDone) {
-        setTimeout(() => {
-          editor.commands.focus('end')
-          setInitialSetupDone(true)
-        }, 100)
-      }
+      // No auto-focus anymore
     }
-  }, [editor, isEditable, initialSetupDone])
+  }, [editor, isEditable])
 
-  // Update content when it changes from props and editor exists
+  // Update content when it changes from props (but only when not focused to avoid conflicts)
   useEffect(() => {
     if (editor && content && !isFocused) {
       const currentContent = editor.getHTML()
@@ -83,12 +102,32 @@ const SectionEditor = ({ content, isEditable, sectionId, onUpdate }: SectionEdit
     }
   }, [content, editor, isFocused])
 
-  // Focus the editor
-  const focusEditor = useCallback(() => {
-    if (editor && isEditable && !isFocused) {
-      editor.commands.focus('end')
+  // Add link function
+  const setLink = useCallback(() => {
+    if (!editor) return
+    
+    // Get the current selection text
+    const previousUrl = editor.getAttributes('link').href
+    const url = window.prompt('URL', previousUrl)
+    
+    // cancelled
+    if (url === null) return
+    
+    // empty
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run()
+      return
     }
-  }, [editor, isEditable, isFocused])
+    
+    // Ensure URL has a protocol
+    let processedUrl = url.trim()
+    if (!/^https?:\/\//i.test(processedUrl)) {
+      processedUrl = 'https://' + processedUrl
+    }
+    
+    // update link
+    editor.chain().focus().extendMarkRange('link').setLink({ href: processedUrl }).run()
+  }, [editor])
 
   if (!isEditable) {
     return (
@@ -100,7 +139,7 @@ const SectionEditor = ({ content, isEditable, sectionId, onUpdate }: SectionEdit
   }
 
   return (
-    <div className="border-none" onClick={focusEditor}>
+    <div className="border-none">
       {isEditable && editor && (
         <div className="flex flex-wrap items-center gap-1 mb-2 p-1 border rounded-md bg-muted/30">
           <Button
@@ -140,22 +179,11 @@ const SectionEditor = ({ content, isEditable, sectionId, onUpdate }: SectionEdit
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={editor.isActive('heading', { level: 1 }) ? 'bg-muted' : ''}
-            title="Heading 1"
+            onClick={setLink}
+            className={editor.isActive('link') ? 'bg-muted' : ''}
+            title="Add link"
           >
-            <Heading1 className="h-4 w-4" />
-          </Button>
-          
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={editor.isActive('heading', { level: 2 }) ? 'bg-muted' : ''}
-            title="Heading 2"
-          >
-            <Heading2 className="h-4 w-4" />
+            <LinkIcon className="h-4 w-4" />
           </Button>
           
           <Button
@@ -196,7 +224,7 @@ const SectionEditor = ({ content, isEditable, sectionId, onUpdate }: SectionEdit
       <div className={`border rounded-md ${isFocused ? 'ring-2 ring-primary/50' : ''}`}>
         <EditorContent 
           editor={editor} 
-          onClick={focusEditor}
+          className="prose-pre:whitespace-pre-wrap prose-pre:break-words"
         />
       </div>
     </div>

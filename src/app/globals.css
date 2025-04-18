@@ -135,3 +135,43 @@
 .animate-fade-in-out {
   animation: fadeInOut 3s ease;
 }
+
+/* Add these styles for code blocks in the Tiptap editor */
+pre {
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow-x: auto !important;
+  max-width: 100% !important;
+  background-color: rgb(243 244 246 / 1) !important;
+  padding: 0.75rem 1rem !important;
+  border-radius: 0.375rem !important;
+}
+
+.dark pre {
+  background-color: rgb(17 24 39 / 1) !important;
+}
+
+pre code {
+  white-space: inherit !important;
+  word-break: break-all !important;
+  overflow-wrap: break-word !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+
+.ProseMirror pre {
+  padding: 0.75rem 1rem !important;
+  border-radius: 0.375rem !important;
+}
+
+/* Improve link styling */
+.ProseMirror a {
+  color: #3b82f6 !important;
+  text-decoration: underline !important;
+  cursor: pointer !important;
+}
+
+.dark .ProseMirror a {
+  color: #60a5fa !important;
+}
