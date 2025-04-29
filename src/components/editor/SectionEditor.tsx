@@ -7,28 +7,68 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Bold, Italic, List, ListOrdered, Code, Strikethrough, Link as LinkIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-interface SectionEditorProps {
-  content: string
-  isEditable: boolean
-  onUpdate?: (content: string) => void
-}
-
 // Parse HTML content safely
 const parseHTML = (html: string) => {
   try {
-    return html || '<p></p>'
+    return html || '<p>Nothing about this section is found.</p>'
   } catch (e) {
     console.error('Error parsing HTML:', e)
     return '<p>Error displaying content</p>'
   }
 }
 
-const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) => {
-  const editorRef = useRef<Editor | null>(null)
-  const [isFocused, setIsFocused] = useState(false)
-  const [initialContent] = useState(() => parseHTML(content))
-  const [debouncedUpdate, setDebouncedUpdate] = useState<NodeJS.Timeout | null>(null)
-  
+interface SectionEditorProps {
+  content: string
+  isEditable: boolean
+  sectionId: string
+  onUpdate?: (content: string) => void
+  immediateUpdate?: boolean // If true, trigger onUpdate immediately for formats/blur
+}
+
+export function SectionEditor({
+  content,
+  isEditable,
+  sectionId,
+  onUpdate,
+  immediateUpdate = false
+}: SectionEditorProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [initialContent] = useState(() => parseHTML(content || ''));
+  // Remove currentContent state, rely on editor.getHTML()
+  const lastSavedContentRef = useRef(initialContent);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced save function for typing
+  const debouncedSave = useCallback((editorInstance: Editor) => {
+    if (!onUpdate) return;
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    const html = editorInstance.getHTML();
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      if (html !== lastSavedContentRef.current) {
+        onUpdate(html);
+        lastSavedContentRef.current = html;
+      }
+    }, 1000); // Standard 1-second debounce for typing
+  }, [onUpdate]);
+
+  // Immediate save function for formatting actions or blur
+  const immediateSave = useCallback((editorInstance: Editor) => {
+    if (!onUpdate) return;
+    // Clear any pending debounced save
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    const html = editorInstance.getHTML();
+    if (html !== lastSavedContentRef.current) {
+      onUpdate(html);
+      lastSavedContentRef.current = html;
+    }
+  }, [onUpdate]);
+
   // Create custom link extension
   const CustomLink = Link.configure({
     openOnClick: false,
@@ -41,113 +81,134 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
   
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [3, 4] // Only allow h3 and h4
-        },
-      }),
-      CustomLink
+      StarterKit,
+      CustomLink,
     ],
     content: initialContent,
     editable: isEditable,
-    onUpdate: ({ editor }) => {
-      // Debounce the update to prevent too many saves
-      if (debouncedUpdate) clearTimeout(debouncedUpdate)
-      const timeout = setTimeout(() => {
-        const html = editor.getHTML()
-        onUpdate?.(html)
-      }, 500) // Wait 500ms before updating
-      setDebouncedUpdate(timeout)
-    },
-    onFocus: () => setIsFocused(true),
-    onBlur: () => setIsFocused(false),
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-[100px] prose prose-sm md:prose-base max-w-none dark:prose-invert p-2 rounded-md prose-pre:whitespace-pre-wrap prose-pre:break-words',
-        spellcheck: 'true',
+        class: 'min-h-[150px] prose max-w-none dark:prose-invert focus:outline-none' // Added dark:prose-invert
       }
-    }
-  })
+    },
+    onFocus: () => setIsFocused(true),
+    onBlur: ({ editor: editorInstance }) => {
+      setIsFocused(false);
+      // Use immediate save on blur if needed, otherwise rely on debounce
+      if (immediateUpdate && editorInstance) {
+        immediateSave(editorInstance);
+      }
+    },
+    onUpdate: ({ editor: editorInstance }) => {
+      if (!editorInstance) return;
+      // Use debounced save for continuous typing
+      debouncedSave(editorInstance);
+    },
+    onCreate: ({ editor: editorInstance }) => {
+      if (editorInstance) {
+        lastSavedContentRef.current = editorInstance.getHTML();
+      }
+    },
+    immediatelyRender: false,
+  });
   
-  // Store the editor reference
   useEffect(() => {
     if (editor) {
-      editorRef.current = editor
+      editor.setEditable(isEditable);
     }
-    
-    // Clean up debounce on unmount
-    return () => {
-      if (debouncedUpdate) clearTimeout(debouncedUpdate)
-    }
-  }, [editor, debouncedUpdate])
+  }, [editor, isEditable]);
 
-  // Handle changes to editable state
-  useEffect(() => {
-    if (editor) {
-      editor.setEditable(isEditable)
-      // No auto-focus anymore
-    }
-  }, [editor, isEditable])
-
-  // Update content when it changes from props (but only when not focused to avoid conflicts)
+  // Update content when it changes from props
   useEffect(() => {
     if (editor && content && !isFocused) {
-      const currentContent = editor.getHTML()
-      const parsedContent = parseHTML(content)
+      const parsedContent = parseHTML(content);
+      const editorContent = editor.getHTML();
       
-      // Only update if content is different to avoid cursor position loss
-      if (parsedContent !== currentContent) {
-        editor.commands.setContent(parsedContent, false)
+      // Only update if the external content is different from the editor's current content
+      if (parsedContent !== editorContent) {
+        // Use setContent to avoid triggering the onUpdate handler unnecessarily
+        editor.commands.setContent(parsedContent, false);
+        // Update the last saved ref to prevent immediate saving of external content
+        lastSavedContentRef.current = parsedContent;
       }
     }
-  }, [content, editor, isFocused])
+  // Depend on content and editor only. isFocused check happens inside.
+  }, [content, editor]); 
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Function to apply formatting and trigger immediate save if necessary
+  const applyFormat = useCallback((command: () => void) => {
+    if (!editor) return;
+    command();
+    // If immediateUpdate is true, save changes right away
+    if (immediateUpdate) {
+      immediateSave(editor);
+    }
+    // Ensure editor remains focused after button click
+    editor.commands.focus(); 
+  }, [editor, immediateUpdate, immediateSave]);
 
   // Add link function
   const setLink = useCallback(() => {
-    if (!editor) return
-    
-    // Get the current selection text
-    const previousUrl = editor.getAttributes('link').href
-    const url = window.prompt('URL', previousUrl)
-    
-    // cancelled
-    if (url === null) return
-    
-    // empty
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
+    if (!editor) return;
+    const previousUrl = editor.getAttributes('link').href;
+    const url = window.prompt('URL', previousUrl);
+
+    if (url === null) {
+      editor.commands.focus();
+      return;
     }
+
+    const commandToRun = () => {
+      if (url === '') {
+        editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      } else {
+        let processedUrl = url.trim();
+        if (!/^https?:\/\//i.test(processedUrl)) {
+          processedUrl = 'https://' + processedUrl;
+        }
+        editor.chain().focus().extendMarkRange('link').setLink({ href: processedUrl }).run();
+      }
+    };
     
-    // Ensure URL has a protocol
-    let processedUrl = url.trim()
-    if (!/^https?:\/\//i.test(processedUrl)) {
-      processedUrl = 'https://' + processedUrl
-    }
-    
-    // update link
-    editor.chain().focus().extendMarkRange('link').setLink({ href: processedUrl }).run()
-  }, [editor])
+    applyFormat(commandToRun);
+
+  }, [editor, applyFormat]);
+
+  // Note: No need for formatCommands wrapper anymore if applyFormat handles it
 
   if (!isEditable) {
     return (
       <div 
         className="prose prose-sm md:prose-base max-w-none dark:prose-invert"
         dangerouslySetInnerHTML={{ __html: parseHTML(content) }}
+        data-section-id={sectionId}
       />
-    )
+    );
+  }
+
+  if (!editor) {
+    return <div>Loading editor...</div>; // Or some placeholder
   }
 
   return (
-    <div className="border-none">
-      {isEditable && editor && (
+    <div className="border-none" data-section-id={sectionId}>
+      {isEditable && (
         <div className="flex flex-wrap items-center gap-1 mb-2 p-1 border rounded-md bg-muted/30">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={editor.isActive('bold') ? 'bg-muted' : ''}
+            onClick={() => applyFormat(() => editor.chain().focus().toggleBold().run())}
+            className={`tiptap-toolbar-button ${editor.isActive('bold') ? 'bg-muted' : ''}`}
             title="Bold"
           >
             <Bold className="h-4 w-4" />
@@ -157,8 +218,8 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={editor.isActive('italic') ? 'bg-muted' : ''}
+            onClick={() => applyFormat(() => editor.chain().focus().toggleItalic().run())}
+            className={`tiptap-toolbar-button ${editor.isActive('italic') ? 'bg-muted' : ''}`}
             title="Italic"
           >
             <Italic className="h-4 w-4" />
@@ -168,8 +229,8 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={editor.isActive('strike') ? 'bg-muted' : ''}
+            onClick={() => applyFormat(() => editor.chain().focus().toggleStrike().run())}
+            className={`tiptap-toolbar-button ${editor.isActive('strike') ? 'bg-muted' : ''}`}
             title="Strike-through"
           >
             <Strikethrough className="h-4 w-4" />
@@ -179,8 +240,9 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
             type="button"
             variant="ghost"
             size="sm"
-            onClick={setLink}
-            className={editor.isActive('link') ? 'bg-muted' : ''}
+            // Use the refactored setLink which calls applyFormat internally
+            onClick={setLink} 
+            className={`tiptap-toolbar-button ${editor.isActive('link') ? 'bg-muted' : ''}`}
             title="Add link"
           >
             <LinkIcon className="h-4 w-4" />
@@ -190,8 +252,8 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={editor.isActive('bulletList') ? 'bg-muted' : ''}
+            onClick={() => applyFormat(() => editor.chain().focus().toggleBulletList().run())}
+            className={`tiptap-toolbar-button ${editor.isActive('bulletList') ? 'bg-muted' : ''}`}
             title="Bullet list"
           >
             <List className="h-4 w-4" />
@@ -201,8 +263,8 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={editor.isActive('orderedList') ? 'bg-muted' : ''}
+            onClick={() => applyFormat(() => editor.chain().focus().toggleOrderedList().run())}
+            className={`tiptap-toolbar-button ${editor.isActive('orderedList') ? 'bg-muted' : ''}`}
             title="Ordered list"
           >
             <ListOrdered className="h-4 w-4" />
@@ -212,8 +274,8 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            className={editor.isActive('codeBlock') ? 'bg-muted' : ''}
+            onClick={() => applyFormat(() => editor.chain().focus().toggleCodeBlock().run())}
+            className={`tiptap-toolbar-button ${editor.isActive('codeBlock') ? 'bg-muted' : ''}`}
             title="Code block"
           >
             <Code className="h-4 w-4" />
@@ -221,14 +283,17 @@ const SectionEditor = ({ content, isEditable, onUpdate }: SectionEditorProps) =>
         </div>
       )}
       
-      <div className={`border rounded-md ${isFocused ? 'ring-2 ring-primary/50' : ''}`}>
+      <div 
+        className={`border rounded-md ${isFocused ? 'ring-2 ring-primary/50' : ''}`}
+        // Remove onClick focus, it might interfere
+      >
         <EditorContent 
           editor={editor} 
-          className="prose-pre:whitespace-pre-wrap prose-pre:break-words"
+          className="p-2 prose-pre:whitespace-pre-wrap prose-pre:break-words"
         />
       </div>
     </div>
-  )
+  );
 }
 
 export default SectionEditor 

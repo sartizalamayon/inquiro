@@ -2,7 +2,7 @@ import type React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardLayout } from "@/components/dashboard/layout"
-import { BarChart3, FileText, FolderOpen, TrendingUp, Users, Calendar, Clock, ArrowUpRight } from "lucide-react"
+import { BarChart3, FileText, FolderOpen, TrendingUp, TrendingDown, Users, Calendar, Clock, ArrowUpRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -13,7 +13,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back! Here's an overview of your research activity.</p>
+            <p className="text-muted-foreground">Welcome back! Here&apos;s an overview of your research activity.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="h-9">
@@ -249,7 +249,4 @@ function StatsCard({ title, value, change, trend, icon }: StatsCardProps) {
     </Card>
   )
 }
-
-// Make sure to import this
-import { TrendingDown } from "lucide-react"
 

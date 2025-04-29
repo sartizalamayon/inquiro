@@ -49,7 +49,7 @@ export default function SignUpPage() {
           } else {
             setError(errorData.detail || "Failed to create account. Please try again.");
           }
-        } catch (parseErr) {
+        } catch {
           setError("Failed to create account. Please try again.");
         }
       }

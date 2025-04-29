@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { toast } from "sonner";
 
@@ -68,6 +68,8 @@ export default function SignInPage() {
         setEmail={setEmail}
         password={password}
         setPassword={setPassword}
+        name=""
+        setName={() => {}}
         isLoading={isLoading}
         error={error}
       />

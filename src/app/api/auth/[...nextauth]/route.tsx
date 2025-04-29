@@ -70,11 +70,12 @@ const handler = NextAuth({
   callbacks: {
     async session({ session, token }) {
       if (token) {
+        session.user = session.user || {};
         session.user.id = token.id as string;
       }
       return session;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
       }
@@ -94,7 +95,7 @@ const handler = NextAuth({
       return url;
     },
     // Add a signIn callback to create user in database for OAuth providers
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       // Only create users for OAuth providers
       if (account && (account.provider === "google" || account.provider === "github")) {
         try {

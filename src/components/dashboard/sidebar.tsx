@@ -19,7 +19,7 @@ export function Sidebar({ className }: SidebarProps) {
   const session = useSession()
   const userEmail = session.data?.user?.email || ""
   const userName = session.data?.user?.name || "Username"
-  const userImage = session.data?.user?.picture || "/default-avatar.png" 
+  
   return (
     <>
       {/* Mobile Sidebar Toggle */}
@@ -100,7 +100,7 @@ export function Sidebar({ className }: SidebarProps) {
                 <span className="text-sm font-medium">US</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-medium"></span>
+                <span className="text-sm font-medium">{userName}</span>
                 <span className="text-xs text-muted-foreground">{userEmail}</span>
               </div>
               <Button variant="ghost" size="icon" className="ml-auto">
