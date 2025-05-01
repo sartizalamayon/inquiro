@@ -2,16 +2,13 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -23,83 +20,44 @@ import {
   Tag,
   BookOpen,
   Users,
-  ArrowUpDown,
   X,
-  ChevronDown,
-  Sparkles,
   History,
   Clock,
-  Filter,
+  Sparkles,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { DashboardLayout } from "@/components/dashboard/layout"
+import { useTopTags } from "@/hooks/useTopTags"
+import { useTopAuthors } from "@/hooks/useTopAuthors"
 
-interface PaperResult {
-  paper_id: string
-  title: string
-  authors: string[]
-  summary_preview: string
-  metadata: {
-    field: string
-    year: number
-    tags: string[]
-  }
-  relevance_score?: number
+// Updated search result interface
+interface SearchResult {
+  _id: string;
+  _score: number;
+  userUploadName: string;
+  title: string;
+  authors: string[];
+  research_problem: string;
+  date_published: string;
+  tags: string[];
 }
-
-// Sample research fields
-const RESEARCH_FIELDS = [
-  "Computer Science",
-  "Machine Learning",
-  "Natural Language Processing",
-  "Computer Vision",
-  "Artificial Intelligence",
-  "Robotics",
-  "Quantum Computing",
-  "Bioinformatics",
-  "Neuroscience",
-  "Physics",
-  "Mathematics",
-  "Chemistry",
-  "Biology",
-  "Medicine",
-  "Economics",
-  "Psychology",
-  "Sociology",
-]
-
-// Sample tags
-const COMMON_TAGS = [
-  "Deep Learning",
-  "Neural Networks",
-  "Transformers",
-  "GPT",
-  "BERT",
-  "Reinforcement Learning",
-  "Computer Vision",
-  "NLP",
-  "Healthcare",
-  "Climate Change",
-  "Ethics",
-  "Explainable AI",
-  "Top"
-]
 
 export default function SearchPage() {
   const router = useRouter()
   const [query, setQuery] = useState("")
-  const [results, setResults] = useState<PaperResult[]>([])
-  const [filteredResults, setFilteredResults] = useState<PaperResult[]>([])
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [filteredResults, setFilteredResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
-  const [yearRange, setYearRange] = useState([2000, 2023])
   const [showFilters, setShowFilters] = useState(false)
-  const [sortOption, setSortOption] = useState("relevance")
-  const [selectedFields, setSelectedFields] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedAuthors, setSelectedAuthors] = useState<string[]>([])
   const [searchHistory, setSearchHistory] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState("all")
 
-  // Apply filters and sorting to results
+  // Fetch top tags and authors
+  const { tags: topTags, loading: tagsLoading } = useTopTags()
+  const { authors: topAuthors, loading: authorsLoading } = useTopAuthors()
+
+  // Apply filters to results
   useEffect(() => {
     if (results.length === 0) {
       setFilteredResults([])
@@ -108,30 +66,22 @@ export default function SearchPage() {
 
     let filtered = [...results]
 
-    // Apply year filter
-    filtered = filtered.filter((paper) => paper.metadata.year >= yearRange[0] && paper.metadata.year <= yearRange[1])
-
-    // Apply field filter
-    if (selectedFields.length > 0) {
-      filtered = filtered.filter((paper) => selectedFields.includes(paper.metadata.field))
-    }
-
-    // Apply tag filter
+    // Apply tag filtering
     if (selectedTags.length > 0) {
-      filtered = filtered.filter((paper) => paper.metadata.tags.some((tag) => selectedTags.includes(tag)))
+      filtered = filtered.filter((paper) => 
+        paper.tags && paper.tags.some((tag) => selectedTags.includes(tag))
+      )
     }
 
-    // Apply sorting
-    if (sortOption === "year-desc") {
-      filtered.sort((a, b) => b.metadata.year - a.metadata.year)
-    } else if (sortOption === "year-asc") {
-      filtered.sort((a, b) => a.metadata.year - b.metadata.year)
-    } else if (sortOption === "relevance" && filtered[0]?.relevance_score !== undefined) {
-      filtered.sort((a, b) => (a.relevance_score || 0) - (b.relevance_score || 0))
+    // Apply author filtering
+    if (selectedAuthors.length > 0) {
+      filtered = filtered.filter((paper) => 
+        paper.authors && paper.authors.some((author) => selectedAuthors.includes(author))
+      )
     }
 
     setFilteredResults(filtered)
-  }, [results, yearRange, selectedFields, selectedTags, sortOption])
+  }, [results, selectedTags, selectedAuthors])
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -139,12 +89,18 @@ export default function SearchPage() {
 
     setLoading(true)
     try {
+      // Prepare the search request with query and any active filters
+      const searchRequest = {
+        query: query,
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
+      }
+
       const response = await fetch("/api/papers/search", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify(searchRequest),
       })
 
       if (!response.ok) {
@@ -169,31 +125,23 @@ export default function SearchPage() {
     router.push(`/dashboard/paper/${paperId}`)
   }
 
-  const handleFieldToggle = (field: string) => {
-    setSelectedFields((prev) => (prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]))
-  }
-
   const handleTagToggle = (tag: string) => {
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
   }
 
-  const clearFilters = () => {
-    setYearRange([2000, 2023])
-    setSelectedFields([])
-    setSelectedTags([])
-    setSortOption("relevance")
+  const handleAuthorToggle = (author: string) => {
+    setSelectedAuthors((prev) => (prev.includes(author) ? prev.filter((a) => a !== author) : [...prev, author]))
   }
 
-  const useHistoryQuery = useCallback(
-    (historyQuery: string) => {
-      setQuery(historyQuery)
-      setTimeout(() => handleSearch(), 0)
-    },
-    [handleSearch],
-  )
+  const clearFilters = () => {
+    setSelectedTags([])
+    setSelectedAuthors([])
+  }
 
+  // Regular function to handle history item clicks
   const handleHistoryItemClick = (historyQuery: string) => {
-    useHistoryQuery(historyQuery)
+    setQuery(historyQuery)
+    setTimeout(() => handleSearch(), 0)
   }
 
   return (
@@ -202,12 +150,12 @@ export default function SearchPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Natural Language Paper Search</h1>
         <p className="text-gray-500">
-          Search for research papers using natural language. Try queries like "recent papers about transformer models in
-          NLP" or "quantum computing papers from 2020 to 2023"
+          Search for research papers using natural language. Try queries like recent papers about transformer models in
+          NLP or quantum computing papers from 2020 to 2023
         </p>
       </div>
 
-      <Tabs defaultValue="all" className="mb-8" onValueChange={setActiveTab}>
+      <Tabs defaultValue="all" className="mb-8">
         <TabsList className="mb-4">
           <TabsTrigger value="all" className="flex items-center gap-2">
             <Search className="h-4 w-4" />
@@ -264,84 +212,58 @@ export default function SearchPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
                         <div className="space-y-4">
                           <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <Label className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                Year Range: {yearRange[0]} - {yearRange[1]}
-                              </Label>
-                            </div>
-                            <Slider
-                              value={yearRange}
-                              min={1950}
-                              max={2023}
-                              step={1}
-                              onValueChange={(value) => setYearRange(value as number[])}
-                              className="py-4"
-                            />
-                          </div>
-
-                          <div>
                             <Label className="flex items-center gap-2 mb-2">
-                              <BookOpen className="h-4 w-4" />
-                              Research Fields
+                              <Tag className="h-4 w-4" />
+                              Common Tags
                             </Label>
-                            <ScrollArea className="h-[150px] border rounded-md p-2">
-                              <div className="space-y-2">
-                                {RESEARCH_FIELDS.map((field) => (
-                                  <div key={field} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`field-${field}`}
-                                      checked={selectedFields.includes(field)}
-                                      onCheckedChange={() => handleFieldToggle(field)}
-                                    />
-                                    <label
-                                      htmlFor={`field-${field}`}
-                                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                    >
-                                      {field}
-                                    </label>
-                                  </div>
-                                ))}
-                              </div>
-                            </ScrollArea>
+                            <div className="flex flex-wrap gap-2">
+                              {tagsLoading ? (
+                                <div className="text-sm text-gray-500">Loading tags...</div>
+                              ) : (
+                                topTags.map((tag) => (
+                                  <Badge
+                                    key={tag.name}
+                                    variant={selectedTags.includes(tag.name) ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => handleTagToggle(tag.name)}
+                                  >
+                                    {tag.name} ({tag.count})
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
                           </div>
                         </div>
 
                         <div className="space-y-4">
                           <div>
                             <Label className="flex items-center gap-2 mb-2">
-                              <Tag className="h-4 w-4" />
-                              Common Tags
+                              <Users className="h-4 w-4" />
+                              Common Authors
                             </Label>
-                            <div className="flex flex-wrap gap-2">
-                              {COMMON_TAGS.map((tag) => (
-                                <Badge
-                                  key={tag}
-                                  variant={selectedTags.includes(tag) ? "default" : "outline"}
-                                  className="cursor-pointer"
-                                  onClick={() => handleTagToggle(tag)}
-                                >
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <Label className="flex items-center gap-2 mb-2">
-                              <ArrowUpDown className="h-4 w-4" />
-                              Sort By
-                            </Label>
-                            <Select value={sortOption} onValueChange={setSortOption}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sort by" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="relevance">Relevance</SelectItem>
-                                <SelectItem value="year-desc">Newest First</SelectItem>
-                                <SelectItem value="year-asc">Oldest First</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <ScrollArea className="h-[150px] border rounded-md p-2">
+                              <div className="space-y-2">
+                                {authorsLoading ? (
+                                  <div className="text-sm text-gray-500">Loading authors...</div>
+                                ) : (
+                                  topAuthors.map((author) => (
+                                    <div key={author.name} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`author-${author.name}`}
+                                        checked={selectedAuthors.includes(author.name)}
+                                        onCheckedChange={() => handleAuthorToggle(author.name)}
+                                      />
+                                      <label
+                                        htmlFor={`author-${author.name}`}
+                                        className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                      >
+                                        {author.name} ({author.count})
+                                      </label>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </ScrollArea>
                           </div>
 
                           <div className="flex justify-end">
@@ -386,41 +308,18 @@ export default function SearchPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Search Results ({filteredResults.length})</h2>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex items-center gap-2">
-                      <Filter className="h-4 w-4" />
-                      <span>Active Filters</span>
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <div className="p-2 text-xs text-gray-500">
-                      <div className="mb-1">
-                        <strong>Year Range:</strong> {yearRange[0]} - {yearRange[1]}
-                      </div>
-                      {selectedFields.length > 0 && (
-                        <div className="mb-1">
-                          <strong>Fields:</strong> {selectedFields.join(", ")}
-                        </div>
-                      )}
-                      {selectedTags.length > 0 && (
-                        <div className="mb-1">
-                          <strong>Tags:</strong> {selectedTags.join(", ")}
-                        </div>
-                      )}
-                      <div>
-                        <strong>Sort:</strong> {sortOption}
-                      </div>
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {(selectedTags.length > 0 || selectedAuthors.length > 0) && (
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="flex items-center gap-2">
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                )}
               </div>
 
               <AnimatePresence>
                 {filteredResults.map((paper, index) => (
                   <motion.div
-                    key={paper.paper_id}
+                    key={paper._id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
@@ -428,38 +327,40 @@ export default function SearchPage() {
                   >
                     <Card
                       className="cursor-pointer hover:shadow-md transition-all border-l-4 hover:border-l-8 border-l-gray-800"
-                      onClick={() => handlePaperClick(paper.paper_id)}
+                      onClick={() => handlePaperClick(paper._id)}
                     >
                       <CardHeader className="pb-2">
                         <CardTitle className="text-lg">{paper.title}</CardTitle>
                         <CardDescription className="flex items-center gap-2">
                           <Users className="h-3 w-3" />
                           {paper.authors.join(", ")}
-                          <Separator orientation="vertical" className="h-4" />
-                          <Calendar className="h-3 w-3" />
-                          {paper.metadata.year}
+                          {paper.date_published && (
+                            <>
+                              <Separator orientation="vertical" className="h-4" />
+                              <Calendar className="h-3 w-3" />
+                              {paper.date_published}
+                            </>
+                          )}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-gray-700">{paper.summary_preview}</p>
+                        <p className="text-sm text-gray-700">{paper.research_problem}</p>
                       </CardContent>
                       <CardFooter className="pt-0 flex flex-wrap gap-2">
                         <Badge variant="outline" className="flex items-center gap-1">
                           <BookOpen className="h-3 w-3" />
-                          {paper.metadata.field}
+                          {paper.userUploadName}
                         </Badge>
-                        {paper.metadata.tags?.map((tag) => (
+                        {paper.tags?.map((tag) => (
                           <Badge key={tag} variant="secondary" className="flex items-center gap-1">
                             <Tag className="h-3 w-3" />
                             {tag}
                           </Badge>
                         ))}
-                        {paper.relevance_score !== undefined && (
-                          <Badge variant="default" className="ml-auto flex items-center gap-1 bg-amber-500">
-                            <Sparkles className="h-3 w-3" />
-                            Score: {(1 - paper.relevance_score).toFixed(2)}
-                          </Badge>
-                        )}
+                        <Badge variant="default" className="ml-auto flex items-center gap-1 bg-amber-500">
+                          <Sparkles className="h-3 w-3" />
+                          Score: {(1 - paper._score).toFixed(2)}
+                        </Badge>
                       </CardFooter>
                     </Card>
                   </motion.div>
@@ -474,7 +375,7 @@ export default function SearchPage() {
                 </div>
                 <h3 className="text-lg font-medium">No results found</h3>
                 <p className="text-sm text-gray-500 max-w-md">
-                  We couldn't find any papers matching your search criteria. Try adjusting your filters or using
+                  We could not find any papers matching your search criteria. Try adjusting your filters or using
                   different keywords.
                 </p>
                 <Button variant="outline" onClick={clearFilters} className="mt-2">
