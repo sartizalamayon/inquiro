@@ -20,6 +20,7 @@ import { DeleteCollectionDialog } from "@/components/collections/delete-collecti
 import { AddTagDialog } from "@/components/collections/add-tag-dialog"
 import { AddPaperDialog } from "@/components/collections/add-paper-dialog"
 
+
 interface CollectionDetailProps {
   collection: Collection
   papers: Paper[]
@@ -30,6 +31,7 @@ interface CollectionDetailProps {
   onRemoveTag: (tag: string) => void
   onAddPaper: (paperId: string) => void
   onRemovePaper: (paperId: string) => void
+  onPaperClick: (paperId: string) => void
   availablePapers: Paper[]
 }
 
@@ -43,6 +45,7 @@ export function CollectionDetail({
   onRemoveTag,
   onAddPaper,
   onRemovePaper,
+  onPaperClick,
   availablePapers,
 }: CollectionDetailProps) {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
@@ -115,36 +118,37 @@ export function CollectionDetail({
         </div>
       </div>
 
-      {collection.tags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Tag className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-          {collection.tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant="outline"
-              className="px-2.5 py-0.5 bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1"
-            >
-              {tag}
-              <button
-                onClick={() => onRemoveTag(tag)}
-                className="ml-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 p-0.5"
+      <div className="flex flex-wrap items-center gap-2">
+        {collection.tags.length > 0 && (
+          <>
+            {collection.tags.map((tag) => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="px-2.5 py-0.5 bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1"
               >
-                <X className="h-3 w-3" />
-                <span className="sr-only">Remove {tag} tag</span>
-              </button>
-            </Badge>
-          ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setAddTagDialogOpen(true)}
-            className="h-7 px-2 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            <Plus className="mr-1 h-3 w-3" />
-            Add Tag
-          </Button>
-        </div>
-      )}
+                {tag}
+                <button
+                  onClick={() => onRemoveTag(tag)}
+                  className="ml-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                  <span className="sr-only">Remove {tag} tag</span>
+                </button>
+              </Badge>
+            ))}
+          </>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAddTagDialogOpen(true)}
+          className="h-7 px-2 text-xs border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          Add Tag
+        </Button>
+      </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 dark:text-zinc-400" />
@@ -171,67 +175,65 @@ export function CollectionDetail({
         </div>
 
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <AnimatePresence initial={false}>
-            {filteredPapers.length > 0 ? (
-              filteredPapers.map((paper, index) => (
-                <motion.div
-                  key={paper._id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.03 }}
-                  className="group px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 flex items-center justify-between"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center">
-                      <div className="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900 mr-3">
-                        <File className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{paper.title}</h4>
-                        <div className="flex items-center text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          <span>{paper.date_published || "No date"}</span>
-                        </div>
+          {filteredPapers.length > 0 ? (
+            filteredPapers.map((paper) => (
+              <div
+                key={paper._id}
+                className="group px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 flex items-center justify-between cursor-pointer"
+                onClick={() => onPaperClick(paper._id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center">
+                    <div className="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900 mr-3">
+                      <File className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{paper.title}</h4>
+                      <div className="flex items-center text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        <span>{paper.date_published || "No date"}</span>
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onRemovePaper(paper._id)}
-                    className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-                    <span className="sr-only">Remove paper</span>
-                  </Button>
-                </motion.div>
-              ))
-            ) : (
-              <div className="px-4 py-8 text-center">
-                {searchQuery ? (
-                  <div className="text-zinc-500 dark:text-zinc-400">
-                    <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No papers match your search</p>
-                  </div>
-                ) : papers.length === 0 ? (
-                  <div className="text-zinc-500 dark:text-zinc-400">
-                    <File className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No papers in this collection</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAddPaperDialogOpen(true)}
-                      className="mt-4 border-zinc-200 dark:border-zinc-800"
-                    >
-                      <Plus className="mr-2 h-3.5 w-3.5" />
-                      Add Paper
-                    </Button>
-                  </div>
-                ) : null}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRemovePaper(paper._id)
+                  }}
+                  className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
+                  <span className="sr-only">Remove paper</span>
+                </Button>
               </div>
-            )}
-          </AnimatePresence>
+            ))
+          ) : (
+            <div className="px-4 py-8 text-center">
+              {searchQuery ? (
+                <div className="text-zinc-500 dark:text-zinc-400">
+                  <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No papers match your search</p>
+                </div>
+              ) : papers.length === 0 ? (
+                <div className="text-zinc-500 dark:text-zinc-400">
+                  <File className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No papers in this collection</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAddPaperDialogOpen(true)}
+                    className="mt-4 border-zinc-200 dark:border-zinc-800"
+                  >
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    Add Paper
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 

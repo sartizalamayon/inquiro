@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { CollectionGrid } from "@/components/collections/collection-grid"
 import { CollectionDetail } from "@/components/collections/collection-detail"
@@ -9,7 +8,8 @@ import { CreateCollectionDialog } from "@/components/collections/create-collecti
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import type { Collection, Paper } from "@/types/collection"
-  
+
+import { useRouter } from "next/navigation"
 
 // Dummy data for collections
 const dummyCollections: Collection[] = [
@@ -122,6 +122,7 @@ const dummyPapers: Paper[] = [
 ]
 
 export default function CollectionsPage() {
+  const router = useRouter()
   const [collections, setCollections] = useState<Collection[]>(dummyCollections)
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -250,64 +251,54 @@ export default function CollectionsPage() {
     return dummyPapers.filter((paper) => collection.papers.includes(paper._id))
   }
 
+  // Function to navigate to paper detail page
+  const handlePaperClick = (paperId: string) => {
+    router.push(`/dashboard/paper/${paperId}`)
+  }
+
   return (
     <DashboardLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Collections</h1>
-            <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-              Organize your research papers into custom collections
-            </p>
+        {!selectedCollection && (
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Collections</h1>
+              <p className="mt-2 text-zinc-500 dark:text-zinc-400">
+                Organize your research papers into custom collections
+              </p>
+            </div>
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Collection
+            </Button>
           </div>
-          <Button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Collection
-          </Button>
-        </div>
+        )}
 
-        <AnimatePresence mode="wait">
-          {selectedCollection ? (
-            <motion.div
-              key="detail"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <CollectionDetail
-                collection={selectedCollection}
-                papers={getCollectionPapers(selectedCollection)}
-                onBack={() => setSelectedCollection(null)}
-                onRename={(newName) => handleRenameCollection(selectedCollection._id, newName)}
-                onDelete={() => handleDeleteCollection(selectedCollection._id)}
-                onAddTag={(tag) => handleAddTag(selectedCollection._id, tag)}
-                onRemoveTag={(tag) => handleRemoveTag(selectedCollection._id, tag)}
-                onAddPaper={(paperId) => handleAddPaper(selectedCollection._id, paperId)}
-                onRemovePaper={(paperId) => handleRemovePaper(selectedCollection._id, paperId)}
-                availablePapers={Object.values(dummyPapers)}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="grid"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <CollectionGrid
-                collections={collections}
-                onSelect={setSelectedCollection}
-                onRename={handleRenameCollection}
-                onDelete={handleDeleteCollection}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {selectedCollection ? (
+          <CollectionDetail
+            collection={selectedCollection}
+            papers={getCollectionPapers(selectedCollection)}
+            onBack={() => setSelectedCollection(null)}
+            onRename={(newName) => handleRenameCollection(selectedCollection._id, newName)}
+            onDelete={() => handleDeleteCollection(selectedCollection._id)}
+            onAddTag={(tag) => handleAddTag(selectedCollection._id, tag)}
+            onRemoveTag={(tag) => handleRemoveTag(selectedCollection._id, tag)}
+            onAddPaper={(paperId) => handleAddPaper(selectedCollection._id, paperId)}
+            onRemovePaper={(paperId) => handleRemovePaper(selectedCollection._id, paperId)}
+            onPaperClick={handlePaperClick}
+            availablePapers={dummyPapers.filter((paper) => !selectedCollection.papers.includes(paper._id))}
+          />
+        ) : (
+          <CollectionGrid
+            collections={collections}
+            onSelect={setSelectedCollection}
+            onRename={handleRenameCollection}
+            onDelete={handleDeleteCollection}
+          />
+        )}
 
         <CreateCollectionDialog
           open={isCreateDialogOpen}
