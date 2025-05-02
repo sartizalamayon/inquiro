@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
 
     // Return the search results
     const searchResults = await response.json();
+    console.log("searchResults")
+    console.log(searchResults)
     return NextResponse.json(searchResults);
   } catch (error) {
     console.error('Search API error:', error);
