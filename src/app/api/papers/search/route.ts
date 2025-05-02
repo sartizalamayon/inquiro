@@ -8,13 +8,22 @@ export async function POST(request: NextRequest) {
     // Get the search request from the client
     const searchData = await request.json();
     
+    // Ensure the request has all required fields
+    const searchRequest = {
+      query: searchData.query,
+      tags: searchData.tags,
+      authors: searchData.authors,
+      year_range: searchData.year_range,
+      score_range: searchData.score_range
+    };
+    
     // Forward the request to the FastAPI backend
     const response = await fetch(`${API_URL}/papers/search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(searchData),
+      body: JSON.stringify(searchRequest),
     });
 
     // Check if the response was successful

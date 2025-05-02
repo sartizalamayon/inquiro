@@ -12,13 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Search, SlidersHorizontal, Tag, Users, X, History, Clock, Sparkles } from "lucide-react"
+import { Search, SlidersHorizontal, Tag, Users, X, History, Clock, Sparkles, Calendar } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { useTopTags } from "@/hooks/useTopTags"
 import { useTopAuthors } from "@/hooks/useTopAuthors"
 import { cn } from "@/lib/utils"
 import { SearchResultCard } from "@/components/search/search-result-card" 
+import { YearRangeSlider } from "@/components/search/year-range-slider"
+import { ScoreRangeSlider } from "@/components/search/score-range-slider"
 
 // Updated search result interface
 interface SearchResult {
@@ -40,6 +42,8 @@ export default function SearchPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedAuthors, setSelectedAuthors] = useState<string[]>([])
+  const [yearRange, setYearRange] = useState<[number, number]>([1990, new Date().getFullYear()])
+  const [scoreRange, setScoreRange] = useState<[number, number]>([0, 1])
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [tab, setTab] = useState("all")
 
@@ -59,6 +63,9 @@ export default function SearchPage() {
       const searchRequest = {
         query: effectiveQuery,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
+        authors: selectedAuthors.length > 0 ? selectedAuthors : undefined,
+        year_range: yearRange,
+        score_range: scoreRange
       }
 
       const response = await fetch("/api/papers/search", {
@@ -99,6 +106,8 @@ export default function SearchPage() {
   const clearFilters = () => {
     setSelectedTags([])
     setSelectedAuthors([])
+    setYearRange([1990, new Date().getFullYear()])
+    setScoreRange([0, 1])
   }
 
   // Regular function to handle history item clicks
@@ -178,7 +187,7 @@ export default function SearchPage() {
                         className="overflow-hidden"
                       >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                          <div className="space-y-4">
+                          <div className="space-y-6">
                             <div>
                               <Label className="flex items-center gap-2 mb-2 text-zinc-900 dark:text-zinc-100">
                                 <Tag className="h-4 w-4" />
@@ -206,6 +215,26 @@ export default function SearchPage() {
                                 )}
                               </div>
                             </div>
+
+                            <div>
+                              <Label className="flex items-center gap-2 mb-2 text-zinc-900 dark:text-zinc-100">
+                                <Calendar className="h-4 w-4" />
+                                Year Range
+                              </Label>
+                              <YearRangeSlider
+                                minYear={1950}
+                                maxYear={new Date().getFullYear()}
+                                value={yearRange}
+                                onChange={setYearRange}
+                              />
+                            </div>
+
+                            <div>
+                              <ScoreRangeSlider
+                                value={scoreRange}
+                                onChange={setScoreRange}
+                              />
+                            </div>
                           </div>
 
                           <div className="space-y-4">
@@ -214,7 +243,7 @@ export default function SearchPage() {
                                 <Users className="h-4 w-4" />
                                 Common Authors
                               </Label>
-                              <ScrollArea className="h-[150px] border rounded-md p-2 border-zinc-200 dark:border-zinc-800">
+                              <ScrollArea className="h-[200px] border rounded-md p-2 border-zinc-200 dark:border-zinc-800">
                                 <div className="space-y-2">
                                   {authorsLoading ? (
                                     <div className="text-sm text-zinc-500 dark:text-zinc-400">Loading authors...</div>
