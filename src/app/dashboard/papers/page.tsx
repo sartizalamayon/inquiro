@@ -24,6 +24,7 @@ import {
   CheckCircle, AlertCircle, Trash2, FolderPlus, X, SlidersHorizontal
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useHtmlParser } from "@/hooks/useHtmlParser"
 
 // Custom dialog component
 const DeleteConfirmDialog = ({ 
@@ -238,6 +239,7 @@ interface Paper {
 }
 
 export default function PapersPage() {
+  const { parseHtml, truncateText } = useHtmlParser()
   const router = useRouter()
   // Grab user email from NextAuth (no checks, just use it)
   const { data: session } = useSession()
@@ -639,8 +641,8 @@ export default function PapersPage() {
                   <CardContent className="pt-0 pb-4 flex-1">
                     <p className={`text-sm ${isErrorPaper ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
                       {isErrorPaper 
-                        ? (paper.summary?.research_problem || "An error occurred while processing this document. Please try again with a different document.") 
-                        : (paper.summary?.research_problem || "No excerpt available.")}
+                        ? (parseHtml(paper.summary?.research_problem) || "An error occurred while processing this document. Please try again with a different document.") 
+                        : (parseHtml(paper.summary?.research_problem) || "No excerpt available.")}
                     </p>
                   </CardContent>
                   <CardFooter className="flex justify-between border-t pt-3">

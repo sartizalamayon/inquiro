@@ -8,11 +8,20 @@ import { motion, AnimatePresence } from "framer-motion"
 
 export function ModeToggle() {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  // Ensures this component only renders after mounting on client
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
 
   // Toggle between dark and light theme
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark")
   }
+
+  if (!mounted) return null
 
   return (
     <Button

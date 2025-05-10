@@ -1,6 +1,6 @@
 export interface Collection {
     _id: string
-    user_id: string
+    user_email: string
     name: string
     tags: string[]
     papers: string[]

@@ -1,154 +1,105 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard/layout"
 import { CollectionGrid } from "@/components/collections/collection-grid"
 import { CollectionDetail } from "@/components/collections/collection-detail"
 import { CreateCollectionDialog } from "@/components/collections/create-collection-dialog"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Loader2, Plus } from "lucide-react"
 import type { Collection, Paper } from "@/types/collection"
+import { useCollections } from "@/hooks/useCollections"
 
 import { useRouter } from "next/navigation"
-
-// Dummy data for collections
-const dummyCollections: Collection[] = [
-  {
-    _id: "col1",
-    user_id: "user1",
-    name: "AI Research",
-    tags: ["artificial intelligence", "machine learning", "neural networks"],
-    papers: ["paper1", "paper2", "paper3"],
-    created_at: new Date("2023-01-15").toISOString(),
-    updated_at: new Date("2023-04-22").toISOString(),
-  },
-  {
-    _id: "col2",
-    user_id: "user1",
-    name: "Quantum Computing",
-    tags: ["quantum", "computing", "physics"],
-    papers: ["paper4", "paper5"],
-    created_at: new Date("2023-02-10").toISOString(),
-    updated_at: new Date("2023-05-18").toISOString(),
-  },
-  {
-    _id: "col3",
-    user_id: "user1",
-    name: "Medical Research",
-    tags: ["medicine", "healthcare", "biology"],
-    papers: ["paper6", "paper7", "paper8", "paper9"],
-    created_at: new Date("2023-03-05").toISOString(),
-    updated_at: new Date("2023-06-12").toISOString(),
-  },
-  {
-    _id: "col4",
-    user_id: "user1",
-    name: "Climate Science",
-    tags: ["climate", "environment", "sustainability"],
-    papers: ["paper10", "paper11"],
-    created_at: new Date("2023-03-20").toISOString(),
-    updated_at: new Date("2023-06-25").toISOString(),
-  },
-]
-
-// Dummy data for papers
-const dummyPapers: Paper[] = [
-  {
-    _id: "paper1",
-    user_email: "user@example.com",
-    title: "Advances in Large Language Models",
-    date_published: "2023-01-10",
-  },
-  {
-    _id: "paper2",
-    user_email: "user@example.com",
-    title: "Transformer Architecture Improvements",
-    date_published: "2023-02-15",
-  },
-  {
-    _id: "paper3",
-    user_email: "user@example.com",
-    title: "Reinforcement Learning from Human Feedback",
-    date_published: "2023-03-20",
-  },
-  {
-    _id: "paper4",
-    user_email: "user@example.com",
-    title: "Quantum Supremacy Experiments",
-    date_published: "2023-01-05",
-  },
-  {
-    _id: "paper5",
-    user_email: "user@example.com",
-    title: "Quantum Error Correction Methods",
-    date_published: "2023-02-25",
-  },
-  {
-    _id: "paper6",
-    user_email: "user@example.com",
-    title: "Novel Cancer Treatment Approaches",
-    date_published: "2023-01-30",
-  },
-  {
-    _id: "paper7",
-    user_email: "user@example.com",
-    title: "mRNA Vaccine Development",
-    date_published: "2023-03-10",
-  },
-  {
-    _id: "paper8",
-    user_email: "user@example.com",
-    title: "Neurological Disease Research",
-    date_published: "2023-04-05",
-  },
-  {
-    _id: "paper9",
-    user_email: "user@example.com",
-    title: "Genomic Sequencing Advancements",
-    date_published: "2023-05-12",
-  },
-  {
-    _id: "paper10",
-    user_email: "user@example.com",
-    title: "Climate Change Mitigation Strategies",
-    date_published: "2023-02-20",
-  },
-  {
-    _id: "paper11",
-    user_email: "user@example.com",
-    title: "Ocean Acidification Studies",
-    date_published: "2023-04-15",
-  },
-]
+import { useSession } from "next-auth/react"
+import { usePapers } from "@/hooks/usePapers" 
 
 export default function CollectionsPage() {
   const router = useRouter()
-  const [collections, setCollections] = useState<Collection[]>(dummyCollections)
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [availablePapers, setAvailablePapers] = useState<Paper[]>([])
+
+  const { data: session, status } = useSession()
+  const userEmail = session?.user?.email || ""
+  
+  // Use our custom hook with user email
+  const {
+    collections,
+    loading,
+    error,
+    fetchCollections,
+    createCollection,
+    updateCollection,
+    deleteCollection,
+    addTagToCollection,
+    removeTagFromCollection,
+    addPaperToCollection,
+    removePaperFromCollection,
+  } = useCollections({ userEmail })
+
+  const {
+    data: papers = [],
+    refetch,
+  } = usePapers(userEmail, "")
+
+  // Fetch collections when session is loaded and userEmail is available
+  useEffect(() => {
+    if (status === "loading") {
+      <div className="col-span-full flex flex-col items-center gap-2 py-16">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <p>Loading Collections...</p>
+        </div>
+    };
+    
+    if (userEmail) {
+      fetchCollections();
+      
+      if (papers.length > 0) {
+        const formattedPapers = papers?.map((paper: {
+          _id: string;
+          user_email: string;
+          title: string;
+          date_published?: string;
+        }) => ({
+          _id: paper._id,
+          user_email: paper.user_email,
+          title: paper.title,
+          date_published: paper.date_published || "",
+        }));
+  
+        setAvailablePapers(formattedPapers);
+      }
+
+    } else if (status === "unauthenticated") {
+      // Redirect to login if not authenticated
+      router.push('/signin?callbackUrl=/dashboard/collections');
+    }
+  }, [userEmail, status, fetchCollections, router, papers]);
+
+
+
+  // Show loading state while session is being fetched
+  if (status === "loading") {
+    return (
+      <DashboardLayout>
+        <div className="col-span-full flex flex-col items-center gap-2 py-16">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <p>Loading Collections...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // Function to create a new collection
   const handleCreateCollection = (name: string, tags: string[]) => {
-    const newCollection: Collection = {
-      _id: `col${collections.length + 1}`,
-      user_id: "user1",
-      name,
-      tags,
-      papers: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    setCollections([...collections, newCollection])
+    createCollection(name, tags)
     setIsCreateDialogOpen(false)
   }
 
   // Function to rename a collection
   const handleRenameCollection = (id: string, newName: string) => {
-    setCollections(
-      collections.map((col) =>
-        col._id === id ? { ...col, name: newName, updated_at: new Date().toISOString() } : col,
-      ),
-    )
+    updateCollection(id, { name: newName })
     if (selectedCollection && selectedCollection._id === id) {
       setSelectedCollection({ ...selectedCollection, name: newName })
     }
@@ -156,7 +107,7 @@ export default function CollectionsPage() {
 
   // Function to delete a collection
   const handleDeleteCollection = (id: string) => {
-    setCollections(collections.filter((col) => col._id !== id))
+    deleteCollection(id)
     if (selectedCollection && selectedCollection._id === id) {
       setSelectedCollection(null)
     }
@@ -164,17 +115,7 @@ export default function CollectionsPage() {
 
   // Function to add a tag to a collection
   const handleAddTag = (collectionId: string, tag: string) => {
-    setCollections(
-      collections.map((col) =>
-        col._id === collectionId
-          ? {
-              ...col,
-              tags: [...col.tags, tag],
-              updated_at: new Date().toISOString(),
-            }
-          : col,
-      ),
-    )
+    addTagToCollection(collectionId, tag)
     if (selectedCollection && selectedCollection._id === collectionId) {
       setSelectedCollection({
         ...selectedCollection,
@@ -185,17 +126,7 @@ export default function CollectionsPage() {
 
   // Function to remove a tag from a collection
   const handleRemoveTag = (collectionId: string, tag: string) => {
-    setCollections(
-      collections.map((col) =>
-        col._id === collectionId
-          ? {
-              ...col,
-              tags: col.tags.filter((t) => t !== tag),
-              updated_at: new Date().toISOString(),
-            }
-          : col,
-      ),
-    )
+    removeTagFromCollection(collectionId, tag)
     if (selectedCollection && selectedCollection._id === collectionId) {
       setSelectedCollection({
         ...selectedCollection,
@@ -206,17 +137,7 @@ export default function CollectionsPage() {
 
   // Function to add a paper to a collection
   const handleAddPaper = (collectionId: string, paperId: string) => {
-    setCollections(
-      collections.map((col) =>
-        col._id === collectionId
-          ? {
-              ...col,
-              papers: [...col.papers, paperId],
-              updated_at: new Date().toISOString(),
-            }
-          : col,
-      ),
-    )
+    addPaperToCollection(collectionId, paperId)
     if (selectedCollection && selectedCollection._id === collectionId) {
       setSelectedCollection({
         ...selectedCollection,
@@ -227,17 +148,7 @@ export default function CollectionsPage() {
 
   // Function to remove a paper from a collection
   const handleRemovePaper = (collectionId: string, paperId: string) => {
-    setCollections(
-      collections.map((col) =>
-        col._id === collectionId
-          ? {
-              ...col,
-              papers: col.papers.filter((p) => p !== paperId),
-              updated_at: new Date().toISOString(),
-            }
-          : col,
-      ),
-    )
+    removePaperFromCollection(collectionId, paperId)
     if (selectedCollection && selectedCollection._id === collectionId) {
       setSelectedCollection({
         ...selectedCollection,
@@ -248,7 +159,7 @@ export default function CollectionsPage() {
 
   // Function to get papers for a collection
   const getCollectionPapers = (collection: Collection) => {
-    return dummyPapers.filter((paper) => collection.papers.includes(paper._id))
+    return availablePapers.filter((paper) => collection.papers.includes(paper._id))
   }
 
   // Function to navigate to paper detail page
@@ -256,9 +167,21 @@ export default function CollectionsPage() {
     router.push(`/dashboard/paper/${paperId}`)
   }
 
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="container mx-auto text-center py-16">
+          <h1 className="text-2xl font-bold text-red-500 mb-4">Error loading collections</h1>
+          <p className="mb-4">{error}</p>
+          <Button onClick={() => fetchCollections()}>Try Again</Button>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto">
         {!selectedCollection && (
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -277,7 +200,12 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {selectedCollection ? (
+        {loading && !selectedCollection ? (
+          <div className="col-span-full flex flex-col items-center gap-2 py-16">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <p>Loading Collections...</p>
+          </div>
+        ) : selectedCollection ? (
           <CollectionDetail
             collection={selectedCollection}
             papers={getCollectionPapers(selectedCollection)}
@@ -289,7 +217,7 @@ export default function CollectionsPage() {
             onAddPaper={(paperId) => handleAddPaper(selectedCollection._id, paperId)}
             onRemovePaper={(paperId) => handleRemovePaper(selectedCollection._id, paperId)}
             onPaperClick={handlePaperClick}
-            availablePapers={dummyPapers.filter((paper) => !selectedCollection.papers.includes(paper._id))}
+            availablePapers={availablePapers.filter((paper) => !selectedCollection.papers.includes(paper._id))}
           />
         ) : (
           <CollectionGrid
@@ -297,6 +225,7 @@ export default function CollectionsPage() {
             onSelect={setSelectedCollection}
             onRename={handleRenameCollection}
             onDelete={handleDeleteCollection}
+            setIsCreateDialogOpen ={setIsCreateDialogOpen}
           />
         )}
 
