@@ -1,325 +1,189 @@
-"use client"
+"use client";
 
-import { useState, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react";
 
-// Types for our analytics data
-export interface ResearchMetric {
-  title: string
-  value: string | number
-  change: string
-  trend: "up" | "down" | "neutral"
-  icon: string
-  description: string
+interface NumericMetrics {
+  total_papers: number; //
+  summarised_papers: number;
+  coverage_pct: number;
+  collections: number;
+  notes: number;
+  time_saved_hours: number;
+  streak_days: number;
+  research_activity: {
+    uploads: number[];
+    summaries: number[];
+    notes: number[];
+  };
+  most_active: {
+    collection: Array<{_id: string, count: number}>;
+    tag: Array<{_id: string, count: number}>;
+    year: Array<{_id: number, count: number}>;
+    month: Array<{_id: number, count: number}>;
+    day: Array<{_id: number, count: number}>;
+  };
+  papers_by_month: Array<{name: string, value: number}>;
 }
 
-export interface TopicDistribution {
-  name: string
-  value: number
-}
-
-export interface ResearchActivity {
-  day: string
-  papers: number
-  notes: number
-  summaries: number
-}
-
-export interface PapersByMonth {
-  month: string
-  papers: number
-}
-
-export interface ResearchRecommendation {
-  title: string
-  authors: string
-  relevance: string
-  reason: string
-}
-
-export interface AIInsight {
-  type: "knowledge_gap" | "citation_pattern" | "reading_suggestion"
-  title: string
-  content: string
-  icon: string
+interface AIInsights {
+  trend_gaps: string[];
+  recommendations: { title: string; reason: string }[];
+  assistant_cards: { title: string; body: string }[];
 }
 
 export interface UseAnalyticsProps {
-  userEmail: string
-  timeframe?: "7d" | "30d" | "90d"
+  userEmail: string;
 }
 
-export function useAnalytics({ userEmail, timeframe = "30d" }: UseAnalyticsProps) {
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
-  const [hasData, setHasData] = useState<boolean>(true)
+/* ─────────────── Hook ─────────────────────────────────── */
+export function useAnalytics({ userEmail }: UseAnalyticsProps) {
+  /* ─ state + fetchAll unchanged ─────────────────────────────── */
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [metrics, setMetrics]   = useState<NumericMetrics | null>(null);
+  const [insights, setInsights] = useState<AIInsights  | null>(null);
 
-  // Function to get research metrics
-  const getResearchMetrics = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
+  
+  const fetchAll = useCallback(async () => {
+    if (!userEmail) return;
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      setLoading(true);
+      const [mRes, iRes] = await Promise.all([
+        fetch(`http://localhost:8000/analytics/metrics/${userEmail}`),
+        fetch(`http://localhost:8000/analytics/insights/${userEmail}`)
+      ]);
+      if (!mRes.ok || !iRes.ok) throw new Error("API error");
+      setMetrics(await mRes.json());
+      setInsights(await iRes.json());
 
-      // Check if user has data
-      const isNewUser = Math.random() > 0.8 // 20% chance of being a new user for demo
-      setHasData(!isNewUser)
-
-      if (isNewUser) {
-        return []
-      }
-
-      return [
-        {
-          title: "Research Coverage",
-          value: "68%",
-          change: "+12%",
-          trend: "up",
-          icon: "CheckCircle2",
-          description: "Papers with complete summaries",
-        },
-        {
-          title: "Knowledge Depth",
-          value: "24",
-          change: "+5",
-          trend: "up",
-          icon: "Layers",
-          description: "Papers with detailed notes",
-        },
-        {
-          title: "Research Efficiency",
-          value: "85%",
-          change: "+7%",
-          trend: "up",
-          icon: "Zap",
-          description: "AI-assisted summaries",
-        },
-        {
-          title: "Topic Diversity",
-          value: "7",
-          change: "+2",
-          trend: "up",
-          icon: "Tag",
-          description: "Unique research areas",
-        },
-      ]
-    } catch (err) {
-      setError("Failed to fetch research metrics")
-      console.error("Error fetching metrics:", err)
-      return []
+      setError(null);
+    } catch (e: any) {
+      setError(e.message ?? "Unknown error");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [userEmail, timeframe])
+  }, [userEmail]);
 
-  // Function to get topic distribution
-  const getTopicDistribution = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-      if (!hasData) return []
+  /* ----- formatters (pure) ----- */
+  const formatCards = useCallback(() => {
+    if (!metrics) return [];
+    const pct = (n: number) => `${n.toFixed(0)}%`;
+    return [
+      {
+        title: "Research Coverage",
+        value: pct(metrics.coverage_pct),
+        change: "+0%",
+        trend : "neutral",
+        icon  : "CheckCircle2",
+        description: "Papers with complete summaries",
+      },
+      {
+        title: "Knowledge Depth",
+        value: metrics.notes,
+        change: "+0",
+        trend : "neutral",
+        icon  : "Layers",
+        description: "Total notes across papers",
+      },
+      {
+        title: "Research Efficiency",
+        value: pct((metrics.summarised_papers || 0 / metrics.total_papers || 0) * 100),
+        change: "+0%",
+        trend : "neutral",
+        icon  : "Zap",
+        description: "Summaries vs uploads",
+      },
+      {
+        title: "Topic Diversity",
+        value: insights ? insights.trend_gaps.length : 0,
+        change: "+0",
+        trend : "neutral",
+        icon  : "Tag",
+        description: "Emerging / under-represented topics",
+      },
+    ];
+  }, [metrics, insights]);
 
-      return [
-        { name: "Machine Learning", value: 35 },
-        { name: "Neural Networks", value: 25 },
-        { name: "Computer Vision", value: 20 },
-        { name: "NLP", value: 15 },
-        { name: "Reinforcement Learning", value: 5 },
-      ]
-    } catch (err) {
-      console.error("Error fetching topic distribution:", err)
-      return []
-    }
-  }, [hasData, timeframe])
+  const formatTopicDistribution = useCallback(() => {
+    if (!insights) return [];
+    const size = insights.trend_gaps.length || 1;
+    return insights.trend_gaps.map(n => ({ name: n, value: 1 / size }));
+  }, [insights]);
 
-  // Function to get research activity
-  const getResearchActivity = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
+  const formatResearchActivity = useCallback(() => {
+    if (!metrics) return [];
+    return metrics.research_activity.uploads.map((_, i) => ({
+      day: `D${i + 1}`,
+      papers:     metrics.research_activity.uploads[i],
+      summaries:  metrics.research_activity.summaries[i],
+      notes:      metrics.research_activity.notes[i],
+    }));
+  }, [metrics]);
 
-      if (!hasData) return []
+  const formatPaperInsights = useCallback(() => {
+     // '{ collection: { _id: string; count: number; }[]; tag: { _id: string; count: number; }[]; year: { _id: number; count: number; }[]; month: { _id: number; count: number; }[]; day: { _id: number; count: number; }[] }'
+    if (!metrics) return [];
+    const { most_active } = metrics;
+    const { collection, tag, year, month, day } = most_active;
+    const collectionInsights = collection.map((item) => ({
+      title: item._id,
+      value: item.count,
+      type: "collection",
+    }));
+    const tagInsights = tag.map((item) => ({
+      title: item._id,
+      value: item.count,
+      type: "tag",
+    }));
+    const yearInsights = year.map((item) => ({
+      title: item._id.toString(),
+      value: item.count,
+      type: "year",
+    }));
+    const monthInsights = month.map((item) => ({
+      title: item._id.toString(),
+      value: item.count,
+      type: "month",
+    }));
+    const dayInsights = day.map((item) => ({  
+      title: item._id.toString(),
+      value: item.count,
+      type: "day",
+    }));
+    return [...collectionInsights, ...tagInsights, ...yearInsights, ...monthInsights, ...dayInsights];
+  }, [metrics]);
 
-      return [
-        { day: "Mon", papers: 2, notes: 5, summaries: 3 },
-        { day: "Tue", papers: 1, notes: 3, summaries: 2 },
-        { day: "Wed", papers: 3, notes: 7, summaries: 4 },
-        { day: "Thu", papers: 0, notes: 2, summaries: 1 },
-        { day: "Fri", papers: 2, notes: 6, summaries: 3 },
-        { day: "Sat", papers: 1, notes: 4, summaries: 2 },
-        { day: "Sun", papers: 0, notes: 1, summaries: 0 },
-      ]
-    } catch (err) {
-      console.error("Error fetching research activity:", err)
-      return []
-    }
-  }, [hasData, timeframe])
+  
 
-  // Function to get papers by month
-  const getPapersByMonth = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
+  /* ----- memoised getters returned to the page ----- */
+  const getResearchMetrics        = useCallback(() => formatCards(),            [formatCards]);
+  const getTopicDistribution      = useCallback(() => formatTopicDistribution(),[formatTopicDistribution]);
+  const getResearchActivity       = useCallback(() => formatResearchActivity(), [formatResearchActivity]);
+  const getPapersByMonth          = useCallback(() => metrics?.papers_by_month ?? [], [metrics]); // placeholder
+  const getPaperInsights           = useCallback(() => formatPaperInsights(), [formatPaperInsights]);
+  const getResearchRecommendations= useCallback(() => insights?.recommendations ?? [], [insights]);
+  const getAIInsights             = useCallback(() => insights?.assistant_cards ?? [], [insights]);
+  const getTrendingTopics         = useCallback(() => insights?.trend_gaps ?? [],      [insights]);
+  const getResearchTags           = useCallback(() => insights?.trend_gaps ?? [],      [insights]);
 
-      if (!hasData) return []
-
-      return [
-        { month: "Jan", papers: 3 },
-        { month: "Feb", papers: 5 },
-        { month: "Mar", papers: 7 },
-        { month: "Apr", papers: 4 },
-        { month: "May", papers: 6 },
-        { month: "Jun", papers: 8 },
-      ]
-    } catch (err) {
-      console.error("Error fetching papers by month:", err)
-      return []
-    }
-  }, [hasData, timeframe])
-
-  // Function to get research recommendations
-  const getResearchRecommendations = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      if (!hasData) return []
-
-      return [
-        {
-          title: "Exploring Multimodal Learning for Vision-Language Tasks",
-          authors: "Zhang et al.",
-          relevance: "98%",
-          reason: "Aligns with your interest in computer vision and NLP",
-        },
-        {
-          title: "Recent Advances in Reinforcement Learning: A Survey",
-          authors: "Johnson et al.",
-          relevance: "92%",
-          reason: "Fills a gap in your current research portfolio",
-        },
-        {
-          title: "Transformer Architectures for Medical Image Analysis",
-          authors: "Patel et al.",
-          relevance: "87%",
-          reason: "Extends your work on transformers to a new domain",
-        },
-      ]
-    } catch (err) {
-      console.error("Error fetching research recommendations:", err)
-      return []
-    }
-  }, [hasData])
-
-  // Function to get AI insights
-  const getAIInsights = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      if (!hasData) return []
-
-      return [
-        {
-          type: "knowledge_gap",
-          title: "Knowledge Gaps",
-          content:
-            "Based on your current papers, you might want to explore more about reinforcement learning and federated learning to round out your knowledge in machine learning.",
-          icon: "Sparkles",
-        },
-        {
-          type: "citation_pattern",
-          title: "Citation Patterns",
-          content:
-            "Your most cited papers focus on neural networks. Consider creating a dedicated collection for these high-impact papers to better organize your references.",
-          icon: "TrendingUp",
-        },
-        {
-          type: "reading_suggestion",
-          title: "Reading Suggestion",
-          content:
-            'You haven\'t reviewed any papers in the "Transformer Architecture" collection in 2 weeks. Consider scheduling time to revisit these papers to maintain continuity in your research.',
-          icon: "BookOpen",
-        },
-      ]
-    } catch (err) {
-      console.error("Error fetching AI insights:", err)
-      return []
-    }
-  }, [hasData])
-
-  // Function to get trending topics
-  const getTrendingTopics = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      if (!hasData) return []
-
-      return [
-        { name: "Large Language Models", growth: "+42%", papers: 124 },
-        { name: "Multimodal Learning", growth: "+38%", papers: 87 },
-        { name: "Reinforcement Learning", growth: "+28%", papers: 65 },
-        { name: "Generative AI", growth: "+25%", papers: 112 },
-        { name: "Federated Learning", growth: "+18%", papers: 43 },
-      ]
-    } catch (err) {
-      console.error("Error fetching trending topics:", err)
-      return []
-    }
-  }, [hasData])
-
-  // Function to get research tags
-  const getResearchTags = useCallback(async () => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      if (!hasData) return []
-
-      return [
-        { name: "Machine Learning", count: 15},
-        { name: "Neural Networks", count: 12},
-        { name: "Deep Learning", count: 10},
-        { name: "Computer Vision", count: 8},
-        { name: "NLP", count: 7},
-        { name: "Transformers", count: 6},
-        { name: "GANs", count: 5},
-        { name: "Reinforcement Learning", count: 4},
-        { name: "Transfer Learning", count: 3},
-        { name: "Attention Mechanisms", count: 3},
-        { name: "Embeddings", count: 2},
-        { name: "Multimodal", count: 2},
-      ]
-    } catch (err) {
-      console.error("Error fetching research tags:", err)
-      return []
-    }
-  }, [hasData])
-
-  // Refresh analytics with a different timeframe
-  const refreshAnalytics = useCallback((newTimeframe: "7d" | "30d" | "90d") => {
-    // In a real implementation, this would update the timeframe and refetch
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-    }, 500)
-  }, [])
 
   return {
     loading,
     error,
-    hasData,
-    getResearchMetrics,
-    getTopicDistribution,
-    getResearchActivity,
-    getPapersByMonth,
-    getResearchRecommendations,
+    hasData: !!metrics && !!insights,
+    getResearchMetrics, // Research Insights cards
+    getTopicDistribution, // Topic Distribution pie chart
+    getResearchActivity, // Research Activity line chart
+    getPapersByMonth, // Papers Over Time Barchart * issue
+    getPaperInsights,
+    getResearchRecommendations, //Research Recommendations
     getAIInsights,
     getTrendingTopics,
     getResearchTags,
-    refreshAnalytics,
-  }
+    refreshAnalytics: fetchAll,
+  };
 }
+
+export default useAnalytics;

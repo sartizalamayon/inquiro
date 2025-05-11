@@ -127,11 +127,11 @@ const iconMap: Record<string, React.ReactNode> = {
 }
 
 export default function DashboardPage() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<"7d" | "30d" | "90d">("30d")
   const [metrics, setMetrics] = useState<any[]>([])
   const [topicDistribution, setTopicDistribution] = useState<any[]>([])
   const [researchActivity, setResearchActivity] = useState<any[]>([])
   const [papersByMonth, setPapersByMonth] = useState<any[]>([])
+  const [papersInsights, setPapersInsights] = useState<any[]>([])
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [aiInsights, setAIInsights] = useState<any[]>([])
   const [trendingTopics, setTrendingTopics] = useState<any[]>([])
@@ -148,14 +148,13 @@ export default function DashboardPage() {
     getTopicDistribution,
     getResearchActivity,
     getPapersByMonth,
+    getPaperInsights,
     getResearchRecommendations,
     getAIInsights,
     getTrendingTopics,
     getResearchTags,
-    refreshAnalytics,
   } = useAnalytics({
-    userEmail: session?.user?.email || "",
-    timeframe: selectedTimeframe,
+    userEmail: session?.user?.email || ""
   })
 
   // Load all data on initial render
@@ -172,6 +171,10 @@ export default function DashboardPage() {
 
       const papersData = await getPapersByMonth()
       setPapersByMonth(papersData)
+
+      const paperInsightsData = await getPaperInsights()
+      setPapersInsights(paperInsightsData)
+
 
       const recommendationsData = await getResearchRecommendations()
       setRecommendations(recommendationsData)
@@ -196,13 +199,10 @@ export default function DashboardPage() {
     getAIInsights,
     getTrendingTopics,
     getResearchTags,
+    getPaperInsights,
+    session?.user?.email,
   ])
 
-  // Handle timeframe change
-  const handleTimeframeChange = (timeframe: "7d" | "30d" | "90d") => {
-    setSelectedTimeframe(timeframe)
-    refreshAnalytics(timeframe)
-  }
 
     // Get chart colors based on theme
     const getChartColors = useCallback(() => {
@@ -220,8 +220,18 @@ export default function DashboardPage() {
   
     // Get bar fill color based on theme
     const getBarFill = useCallback(() => {
-      return theme === "dark" ? "#FFFFFF" : "#000000"
+      return theme === "dark" ? "#AAAAAA" : "#666666"
     }, [theme])
+
+  console.log('recommendations', recommendations)
+  console.log('papersInsights', papersInsights)
+  console.log('papersByMonth', papersByMonth)
+  console.log('topicDistribution', topicDistribution)
+  console.log('researchActivity', researchActivity)
+  console.log('metrics', metrics)
+  console.log('trendingTopics', trendingTopics)
+  console.log('researchTags', researchTags)
+  console.log('aiInsights', aiInsights)
 
 
   return (
@@ -296,7 +306,7 @@ export default function DashboardPage() {
                 <InsightCard
                   key={index}
                   title={metric.title}
-                  value={metric.value}
+                  value={metric.value || 0}
                   change={metric.change}
                   trend={metric.trend}
                   icon={iconMap[metric.icon] || <FileText className="h-4 w-4" />}
@@ -345,7 +355,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recommendations.map((paper, i) => (
+                  {recommendations.length > 0 ?( recommendations.map((paper, i) => (
                     <div
                       key={i}
                       className="flex items-center gap-4 rounded-lg border p-3 transition-colors hover:bg-muted/50"
@@ -354,17 +364,20 @@ export default function DashboardPage() {
                         <Lightbulb className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center">
-                          <p className="text-sm font-medium flex-1">{paper.title}</p>
-                          <Badge variant="outline" className="bg-primary/5 text-center min-w-[60px]">
-                            {paper.relevance}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{paper.authors}</p>
+                        
+                        <p className="text-sm font-medium">{paper.title}</p>
                         <p className="text-xs text-muted-foreground mt-1">{paper.reason}</p>
                       </div>
                     </div>
-                  ))}
+                  ))):
+                  (
+                    <p className="text-sm text-muted-foreground">
+                      Not enough Activity to generate recommendations.
+                      <br />
+                    </p>
+                    )
+                    }
+                  
                 </div>
               </CardContent>
             </Card>
@@ -377,32 +390,6 @@ export default function DashboardPage() {
                   <TabsTrigger value="papers">Papers</TabsTrigger>
                   <TabsTrigger value="topics">Topics</TabsTrigger>
                 </TabsList>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Button
-                    variant={selectedTimeframe === "7d" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8"
-                    onClick={() => handleTimeframeChange("7d")}
-                  >
-                    7d
-                  </Button>
-                  <Button
-                    variant={selectedTimeframe === "30d" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8"
-                    onClick={() => handleTimeframeChange("30d")}
-                  >
-                    30d
-                  </Button>
-                  <Button
-                    variant={selectedTimeframe === "90d" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8"
-                    onClick={() => handleTimeframeChange("90d")}
-                  >
-                    90d
-                  </Button>
-                </div>
               </div>
 
               <TabsContent value="insights" className="space-y-4">
@@ -475,7 +462,8 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        {topicDistribution && topicDistribution.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
                               data={topicDistribution}
@@ -495,6 +483,11 @@ export default function DashboardPage() {
                             <Tooltip content={<CustomTooltip theme={theme} />} />
                           </PieChart>
                         </ResponsiveContainer>
+                        ):(
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-muted-foreground">No topic data available</p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -503,72 +496,104 @@ export default function DashboardPage() {
 
               <TabsContent value="papers" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Papers Over Time</CardTitle>
-                      <CardDescription>Your research paper collection growth</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={papersByMonth} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke={getGridColor()} />
-                            <XAxis
-                              dataKey="month"
-                              stroke={getAxisColor()}
-                              tick={{ fill: getAxisColor() }}
-                              tickLine={{ stroke: getAxisColor() }}
-                            />
-                            <YAxis
-                              stroke={getAxisColor()}
-                              tick={{ fill: getAxisColor() }}
-                              tickLine={{ stroke: getAxisColor() }}
-                            />
-                            <Tooltip content={<CustomTooltip theme={theme} />} />
-                            <Bar
-                              dataKey="papers"
-                              fill={getBarFill()}
-                              name="Papers"
-                              // Add a stroke to make bars visible in dark mode
-                              stroke={theme === "dark" ? "#FFFFFF" : "none"}
-                              strokeWidth={theme === "dark" ? 1 : 0}
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <Card>
+  <CardHeader>
+    <CardTitle>Papers Over Time</CardTitle>
+    <CardDescription>Your research paper collection growth</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="h-[300px]">
+      {papersByMonth && papersByMonth.length > 0 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={papersByMonth} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={getGridColor()} />
+            <XAxis
+              dataKey="name"
+              stroke={getAxisColor()}
+              tick={{ fill: getAxisColor() }}
+              tickLine={{ stroke: getAxisColor() }}
+            />
+            <YAxis
+              stroke={getAxisColor()}
+              tick={{ fill: getAxisColor() }}
+              tickLine={{ stroke: getAxisColor() }}
+            />
+            <Tooltip content={<CustomTooltip theme={theme} />} />
+            <Bar
+              dataKey="value"
+              fill={getBarFill()}
+              name="Papers"
+              // Add a stroke to make bars visible in dark mode
+              stroke={theme === "dark" ? "#AAAAAA" : "none"}
+              strokeWidth={theme === "dark" ? 1 : 0}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No paper data available</p>
+        </div>
+      )}
+    </div>
+  </CardContent>
+</Card>
+
+
+
+
 
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Paper Insights</CardTitle>
-                      <CardDescription>Analysis of your research papers</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Average Paper Age</p>
-                          <p className="text-sm">8 months</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Most Active Collection</p>
-                          <p className="text-sm">Machine Learning (12 papers)</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Most Annotated Paper</p>
-                          <p className="text-sm">Neural Networks (8 notes)</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Papers Needing Review</p>
-                          <p className="text-sm">3 papers</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Recently Added</p>
-                          <p className="text-sm">2 this week</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+  <CardHeader>
+    <CardTitle>Paper Insights</CardTitle>
+    <CardDescription>Analysis of your research papers</CardDescription>
+  </CardHeader>
+  <CardContent className="h-full">
+    <div className="space-y-4 h-full">
+      {papersInsights.length > 0 ? (
+        <>
+          {papersInsights.find(item => item.type === 'collection') && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Most Active Collection</p>
+              <p className="text-sm">{papersInsights.find(item => item.type === 'collection')?.title} ({papersInsights.find(item => item.type === 'collection')?.value} papers)</p>
+            </div>
+          )}
+          
+          {papersInsights.find(item => item.type === 'tag') && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Most Used Tag</p>
+              <p className="text-sm">{papersInsights.find(item => item.type === 'tag')?.title} ({papersInsights.find(item => item.type === 'tag')?.value} papers)</p>
+            </div>
+          )}
+          
+          {papersInsights.find(item => item.type === 'year') && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Most Active Year</p>
+              <p className="text-sm">{papersInsights.find(item => item.type === 'year')?.title} ({papersInsights.find(item => item.type === 'year')?.value} papers)</p>
+            </div>
+          )}
+          
+          {papersInsights.find(item => item.type === 'month') && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Most Active Month</p>
+              <p className="text-sm">Month {papersInsights.find(item => item.type === 'month')?.title} ({papersInsights.find(item => item.type === 'month')?.value} papers)</p>
+            </div>
+          )}
+          
+          {papersInsights.find(item => item.type === 'day') && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Most Active Day</p>
+              <p className="text-sm">Day {papersInsights.find(item => item.type === 'day')?.title} ({papersInsights.find(item => item.type === 'day')?.value} papers)</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No paper data available</p>
+        </div>
+      )}
+    </div>
+  </CardContent>
+</Card>
                 </div>
               </TabsContent>
 
@@ -581,22 +606,23 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {trendingTopics.map((topic, i) => (
+                        {trendingTopics.length > 0 ? ( trendingTopics.map((topic, i) => (
                           <div key={i} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                                 <TrendingUp className="h-4 w-4 text-primary" />
                               </div>
                               <div>
-                                <p className="text-sm font-medium">{topic.name}</p>
-                                <p className="text-xs text-muted-foreground">{topic.papers} papers</p>
+                                <p className="text-sm font-medium">{topic}</p>
+                    
                               </div>
                             </div>
-                            <Badge variant="outline" className="bg-primary/5">
-                              {topic.growth}
-                            </Badge>
                           </div>
-                        ))}
+                        ))): (
+                          <div className="flex h-full">
+                            <p className="text-muted-foreground">No trending topics available</p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -608,16 +634,20 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-2">
-                        {researchTags.map((tag, i) => (
+                        {researchTags.length > 0 ? (researchTags.map((tag, i) => (
                           <Badge
                             key={i}
                             className={cn(
                               "px-3 py-1 text-xs bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300",
                             )}
                           >
-                            {tag.name} ({tag.count})
+                            {tag}
                           </Badge>
-                        ))}
+                        ))):(
+                          <div className="flex items-center justify-center h-full">
+                            <p className="text-muted-foreground">No research tags available</p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -638,15 +668,20 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {aiInsights.map((insight, index) => (
+                  {aiInsights.length > 0 ? (aiInsights.map((insight, index) => (
                     <div key={index} className="rounded-lg bg-zinc-800 p-4">
                       <h3 className="text-sm font-medium text-white mb-2 flex items-center">
-                        {iconMap[insight.icon] || <Sparkles className="h-4 w-4 mr-2 text-zinc-300" />}
+                        {<Sparkles className="h-4 w-4 mr-2 text-zinc-300" />}
                         {insight.title}
                       </h3>
-                      <p className="text-xs text-zinc-300">{insight.content}</p>
+                
+                      <p className="text-xs text-zinc-300">{insight.body}</p>
                     </div>
-                  ))}
+                  ))) : (
+                    <div className="flex h-full">
+                      <p className="text-zinc-300 text-sm">No AI insights available. Upload some papers to get started!</p>
+                    </div>
+                    )}
                 </div>
               </CardContent>
               

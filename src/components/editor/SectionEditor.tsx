@@ -8,7 +8,7 @@ import { Bold, Italic, List, ListOrdered, Code, Strikethrough, Link as LinkIcon 
 import { Button } from '@/components/ui/button'
 
 // Parse HTML content safely
-const parseHTML = (html: string) => {
+const parseInnerHTML = (html: string) => {
   try {
     return html || '<p>Nothing about this section is found.</p>'
   } catch (e) {
@@ -33,7 +33,7 @@ export function SectionEditor({
   immediateUpdate = false
 }: SectionEditorProps) {
   const [isFocused, setIsFocused] = useState(false);
-  const [initialContent] = useState(() => parseHTML(content || ''));
+  const [initialContent] = useState(() => parseInnerHTML(content || ''));
   // Remove currentContent state, rely on editor.getHTML()
   const lastSavedContentRef = useRef(initialContent);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,7 +121,7 @@ export function SectionEditor({
   // Update content when it changes from props
   useEffect(() => {
     if (editor && content && !isFocused) {
-      const parsedContent = parseHTML(content);
+      const parsedContent = parseInnerHTML(content);
       const editorContent = editor.getHTML();
       
       // Only update if the external content is different from the editor's current content
@@ -189,7 +189,7 @@ export function SectionEditor({
     return (
       <div 
         className="prose prose-sm md:prose-base max-w-none dark:prose-invert"
-        dangerouslySetInnerHTML={{ __html: parseHTML(content) }}
+        dangerouslySetInnerHTML={{ __html: parseInnerHTML(content) }}
         data-section-id={sectionId}
       />
     );
