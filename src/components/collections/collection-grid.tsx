@@ -95,17 +95,26 @@ export function CollectionGrid({ collections, onSelect, onRename, onDelete, setI
                     <span className="sr-only">Open menu</span>
                   </Button>
                 </DropdownMenuTrigger>
-        
+
+
+                {/* Menu items */}
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem
-                    onSelect={() => requestAnimationFrame(() => onSelect(collection))}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      requestAnimationFrame(() => onSelect(collection))
+                    }
+                  }
                   >
                     Open collection
                   </DropdownMenuItem>
         
                   <DropdownMenuItem
-                    onSelect={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       requestAnimationFrame(() => handleRenameClick(collection))
+                    }
                     }
                   >
                     Rename
@@ -114,8 +123,10 @@ export function CollectionGrid({ collections, onSelect, onRename, onDelete, setI
                   <DropdownMenuSeparator />
         
                   <DropdownMenuItem
-                    onSelect={() =>
+                    onClick={(e) =>{
+                      e.stopPropagation();
                       requestAnimationFrame(() => handleDeleteClick(collection))
+                    }
                     }
                     className="text-red-600 dark:text-red-400"
                     variant="destructive"

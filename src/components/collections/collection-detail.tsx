@@ -100,20 +100,46 @@ export function CollectionDetail({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setRenameDialogOpen(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setAddTagDialogOpen(true)}>
-                <Tag className="mr-2 h-4 w-4" />
-                Add Tag
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-red-600 dark:text-red-400">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Collection
-              </DropdownMenuItem>
-            </DropdownMenuContent>
+  <DropdownMenuItem 
+    onClick={(e) => {
+      e.stopPropagation();
+      // Close the dropdown menu first before opening dialog
+      document.body.click(); // Force close dropdown
+      setTimeout(() => setRenameDialogOpen(true), 100);
+    }}
+  >
+    <Edit className="mr-2 h-4 w-4" />
+    Rename
+  </DropdownMenuItem>
+  
+  <DropdownMenuItem 
+    onClick={(e) => {
+      e.stopPropagation();
+      // Close the dropdown menu first before opening dialog
+      document.body.click(); // Force close dropdown
+      setTimeout(() => setAddTagDialogOpen(true), 100);
+    }}
+  >
+    <Tag className="mr-2 h-4 w-4" />
+    Add Tag
+  </DropdownMenuItem>
+  
+  <DropdownMenuSeparator />
+  
+  <DropdownMenuItem 
+    onClick={(e) => {
+      e.stopPropagation();
+      // Close the dropdown menu first before opening dialog
+      document.body.click(); // Force close dropdown
+      setTimeout(() => setDeleteDialogOpen(true), 100);
+    }}
+    className="text-red-600 dark:text-red-400"
+  >
+    <Trash2 className="mr-2 h-4 w-4" />
+    Delete Collection
+  </DropdownMenuItem>
+</DropdownMenuContent>
+
           </DropdownMenu>
         </div>
       </div>
