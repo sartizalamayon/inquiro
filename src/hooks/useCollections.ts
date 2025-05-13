@@ -135,6 +135,7 @@ export function useCollections({ userEmail }: UseCollectionsProps) {
       
       if (!response.ok) {
         throw new Error('Failed to add tag to collection');
+        console.log(response)
       }
       
       const data = await response.json();
@@ -156,6 +157,7 @@ export function useCollections({ userEmail }: UseCollectionsProps) {
       const message = err instanceof Error ? err.message : 'An unknown error occurred';
       setError(message);
       toast.error('Failed to add tag');
+      console.log(error)
       return null;
     } finally {
       setLoading(false);
