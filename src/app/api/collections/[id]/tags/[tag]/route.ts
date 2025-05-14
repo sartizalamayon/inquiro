@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       );
     }
 
-    const response = await fetch(`${API_URL}/collections/${collectionId}/tags/${tag}?user_email=${user_email}`, {
+    const response = await fetch(`${API_URL}/collections/${collectionId}/tags/${tag}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

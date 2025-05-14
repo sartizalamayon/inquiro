@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, MoreHorizontal, Tag, Plus, Search, File, Trash2, X, Edit, Calendar, FolderOpen } from "lucide-react"
 import type { Collection, Paper } from "@/types/collection"
 import { formatDistanceToNow } from "date-fns"
@@ -19,6 +18,9 @@ import { RenameCollectionDialog } from "@/components/collections/rename-collecti
 import { DeleteCollectionDialog } from "@/components/collections/delete-collection-dialog"
 import { AddTagDialog } from "@/components/collections/add-tag-dialog"
 import { AddPaperDialog } from "@/components/collections/add-paper-dialog"
+import { ShareCollectionDialog } from "./share-collection-dialog"
+import { useSession } from "next-auth/react"
+import { useUserAccessForCollection } from "@/hooks/useUserAccessForCollection"
 
 
 interface CollectionDetailProps {
@@ -52,9 +54,20 @@ export function CollectionDetail({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [addTagDialogOpen, setAddTagDialogOpen] = useState(false)
   const [addPaperDialogOpen, setAddPaperDialogOpen] = useState(false)
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
+  const session = useSession()
+  const userEmail = session?.data?.user?.email || ""
+
+  const accessLevel = useUserAccessForCollection(collection._id, userEmail)
+
+
+
+
   const filteredPapers = papers.filter((paper) => paper.title.toLowerCase().includes(searchQuery.toLowerCase()))
+
+
 
   return (
     <div className="space-y-6">
@@ -124,20 +137,37 @@ export function CollectionDetail({
     Add Tag
   </DropdownMenuItem>
   
-  <DropdownMenuSeparator />
+  {(collection.user_email && userEmail === collection.user_email) && (
+    <>
+    <DropdownMenuSeparator />
+
+<DropdownMenuItem 
+  onClick={(e) => {
+    e.stopPropagation();
+    // Close the dropdown menu first before opening dialog
+    document.body.click(); // Force close dropdown
+    setTimeout(() => setShareDialogOpen(true), 100);
+  }}
+>
+  <Tag className="mr-2 h-4 w-4" />
+  Share
+</DropdownMenuItem>
+
+<DropdownMenuItem 
+  onClick={(e) => {
+    e.stopPropagation();
+    // Close the dropdown menu first before opening dialog
+    document.body.click(); // Force close dropdown
+    setTimeout(() => setDeleteDialogOpen(true), 100);
+  }}
+  className="text-red-600 dark:text-red-400"
+>
+  <Trash2 className="mr-2 h-4 w-4" />
+  Delete Collection
+</DropdownMenuItem>
+    </>
+  )}
   
-  <DropdownMenuItem 
-    onClick={(e) => {
-      e.stopPropagation();
-      // Close the dropdown menu first before opening dialog
-      document.body.click(); // Force close dropdown
-      setTimeout(() => setDeleteDialogOpen(true), 100);
-    }}
-    className="text-red-600 dark:text-red-400"
-  >
-    <Trash2 className="mr-2 h-4 w-4" />
-    Delete Collection
-  </DropdownMenuItem>
 </DropdownMenuContent>
 
           </DropdownMenu>
@@ -289,6 +319,12 @@ export function CollectionDetail({
         onOpenChange={setAddPaperDialogOpen}
         onAddPaper={onAddPaper}
         availablePapers={availablePapers.filter((paper) => !collection.papers.includes(paper._id))}
+      />
+      <ShareCollectionDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        collectionId={collection._id}
+        collectionName={collection.name}
       />
     </div>
   )
