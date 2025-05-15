@@ -12,7 +12,6 @@ import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { User, Lock, Clock, LogOut, Save, Loader2 } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard/layout"
-import { useUser } from "@/hooks/useUser"
 
 interface UserProfile {
   _id: string

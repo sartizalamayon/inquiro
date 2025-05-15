@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import { ChevronRight, Calendar, FileText, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useHtmlParser } from "@/hooks/useHTMLparser"
+import { useHtmlParser } from "@/hooks/useHtmlParser"
 
 interface SearchResult {
   _id: string
