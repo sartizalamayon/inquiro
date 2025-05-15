@@ -95,8 +95,10 @@ export function CollectionDetail({
           </div>
         </div>
 
+        {accessLevel === "scan"  || (
         <div className="flex items-center space-x-2">
-          <Button
+          
+            <Button
             variant="outline"
             size="sm"
             onClick={() => setAddPaperDialogOpen(true)}
@@ -105,6 +107,7 @@ export function CollectionDetail({
             <Plus className="mr-2 h-3.5 w-3.5" />
             Add Paper
           </Button>
+         
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
@@ -172,7 +175,9 @@ export function CollectionDetail({
 
           </DropdownMenu>
         </div>
+         )}
       </div>
+      
 
       <div className="flex flex-wrap items-center gap-2">
         {collection.tags.length > 0 && (
@@ -184,18 +189,21 @@ export function CollectionDetail({
                 className="px-2.5 py-0.5 bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center gap-1"
               >
                 {tag}
-                <button
+                {accessLevel === "scan" || (
+                  <button
                   onClick={() => onRemoveTag(tag)}
                   className="ml-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 p-0.5"
                 >
                   <X className="h-3 w-3" />
                   <span className="sr-only">Remove {tag} tag</span>
                 </button>
+                )}
               </Badge>
             ))}
           </>
         )}
-        <Button
+        {accessLevel === "scan" || (
+          <Button
           variant="outline"
           size="sm"
           onClick={() => setAddTagDialogOpen(true)}
@@ -204,6 +212,7 @@ export function CollectionDetail({
           <Plus className="mr-1 h-3 w-3" />
           Add Tag
         </Button>
+        )}
       </div>
 
       <div className="relative">

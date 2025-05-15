@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useHtmlParser } from "@/hooks/useHtmlParser"
+import { SaveToCollectionDialog } from "@/components/collections/save-to-collection-dialog"
 
 // Custom dialog component
 const DeleteConfirmDialog = ({ 
@@ -262,6 +263,19 @@ export default function PapersPage() {
   // Custom fields state
   const [customFields, setCustomFields] = useState<string[]>([])
   const [fieldsModalOpen, setFieldsModalOpen] = useState(false)
+  
+  // Save to collection dialog state
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+
+
+  // Paper ID for saving to collection
+  const [paperId, setPaperId] = useState<string>("")
+
+  const handleSaveToCollection = (id: string) => {
+    setPaperId(id)
+    setSaveDialogOpen(true)
+  }
+
 
   // 1) Use the custom hook to fetch papers
   const {
@@ -461,6 +475,9 @@ export default function PapersPage() {
         }}
         title={paperToDelete?.title || ""}
       />
+
+
+      <SaveToCollectionDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen} paperId={paperId} />
       
       <div className="flex flex-col gap-6">
         {/* Title & subtitle */}
@@ -600,7 +617,7 @@ export default function PapersPage() {
                           <DropdownMenuGroup>
                             <DropdownMenuItem 
                               disabled={isErrorPaper}
-                              onClick={() => toast.info("Add to collection feature coming soon")}>
+                              onClick={() => {handleSaveToCollection(paper._id)}}>
                               <FolderPlus className="mr-2 h-4 w-4" />
                               <span>Add to Collection</span>
                             </DropdownMenuItem>
@@ -641,8 +658,8 @@ export default function PapersPage() {
                   <CardContent className="pt-0 pb-4 flex-1">
                     <p className={`text-sm ${isErrorPaper ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
                       {isErrorPaper 
-                        ? (parseHtml(paper.summary?.research_problem) || "An error occurred while processing this document. Please try again with a different document.") 
-                        : (parseHtml(paper.summary?.research_problem) || "No excerpt available.")}
+                        ? (truncateText(parseHtml(paper.summary?.research_problem), 200) || "An error occurred while processing this document. Please try again with a different document.") 
+                        : (truncateText(parseHtml(paper.summary?.research_problem), 200) || "No excerpt available.")}
                     </p>
                   </CardContent>
                   <CardFooter className="flex justify-between border-t pt-3">

@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
     // Temporarily ignore TypeScript errors during development
     ignoreBuildErrors: true,
   },
+
+  images: {
+    domains: [
+      "github.com",
+      "lh3.googleusercontent.com",
+      "avatars.githubusercontent.com",
+      "res.cloudinary.com",
+      "images.unsplash.com",
+    ],
+  },
 };
 
 export default nextConfig;

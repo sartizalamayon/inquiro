@@ -19,6 +19,9 @@ import SectionEditor from "./SectionEditor";
 import useWebSocketEditor from "@/hooks/useWebSocketEditor";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePaperPermission } from "@/hooks/usePaperPermissions";
+import { SaveToCollectionDialog } from "@/components/collections/save-to-collection-dialog"
+import UserImage from "../user/userImage";
 
 // Type definition for a user given field
 interface UserGivenField {
@@ -52,6 +55,13 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
   const queryClient = useQueryClient();
   // Reference to control the popover for mobile
   const popoverTriggerRef = useRef<HTMLButtonElement>(null);
+  
+  // Paper permissions
+  const sessionEmail = session?.user?.email || "";
+  const [savetoCollection, setSavetoCollection] = useState(false);
+  
+  const rawAccessLevel = usePaperPermission(paperId, sessionEmail);
+const accessLevel = useMemo(() => rawAccessLevel.replace(/^"(.*)"$/, "$1").trim(), [rawAccessLevel]);
 
   // Use the custom hook for notes
   const { 
@@ -305,9 +315,11 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
             <div className="text-muted-foreground border rounded-md p-4 text-center">
               <p>No notes yet.</p>
               <div className="mt-2">
-                <Button variant="outline" size="sm" onClick={() => handleNoteSelection("metadata")}>
+                {accessLevel === "control" && (
+                  <Button variant="outline" size="sm" onClick={() => handleNoteSelection("metadata")}>
                   <PlusCircle className="h-3 w-3 mr-1" /> Add your first note
                 </Button>
+                )}
               </div>
             </div>
           ) : (
@@ -353,6 +365,11 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
       )}
       </div>
     );
+  
+    if (!accessLevel) {
+      // You can render a loading spinner or nothing while permission is loading
+      return <div className="flex items-center justify-center min-h-screen">Loading permissions...</div>;
+    }
 
   // --- Loading / Error States --- 
   if (isLoading) return <div className="flex items-center justify-center min-h-screen">Loading paper...</div>;
@@ -365,10 +382,11 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
 
   // --- Main Render --- 
   return (
+    <><SaveToCollectionDialog open={savetoCollection} onOpenChange={setSavetoCollection} paperId={paperId} />
     <div className="flex flex-col min-h-screen bg-background">
       {/* Top Header */}
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex items-center justify-between h-14 px-4">
+        <div className="flex items-center justify-between h-14 px-4 w-full">
           {/* Left Header */} 
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
@@ -426,20 +444,30 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
               <span className="text-sm text-green-600 dark:text-green-500 animate-fade-in-out">Saved!</span>
             )}
             
-            {!isEditMode && (
-              <Button variant="outline" size="sm" onClick={() => console.log("Save to collection")}>
-                <Bookmark className="h-4 w-4 mr-2" /> Save to collection
-            </Button>
-            )}
+            {!isEditMode && accessLevel == "control" && (
+  <Button variant="outline" size="sm" onClick={() => setSavetoCollection(true)}>
+    <Bookmark className="h-4 w-4 mr-2" /> Save to collection
+  </Button>
+  
+)}
+
+          {accessLevel === "control" && (
             <Button variant={isEditMode ? "secondary" : "outline"} size="sm" onClick={toggleEditMode} disabled={isSaving}>
-              {isEditMode ? (<><Eye className="h-4 w-4 mr-2" /> View</>) : (<><Edit className="h-4 w-4 mr-2" /> Edit</>)}
-            </Button>
+            {isEditMode ? (<><Eye className="h-4 w-4 mr-2" /> View</>) : (<><Edit className="h-4 w-4 mr-2" /> Edit</>)}
+          </Button>
+          )}
+
+            
+
+            
+            
+            
             <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             {session?.user && (
               <Avatar className="h-8 w-8">
-                <img src={session.user.image || "https://github.com/shadcn.png"} alt={session.user.name || "User"} />
+                <UserImage/>
               </Avatar>
             )}
           </div>
@@ -477,9 +505,11 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
             <section id="metadata" ref={(el) => { sectionRefs.current['metadata'] = el; }} className="space-y-4">
               <h2 className="text-2xl font-bold tracking-tight flex items-center">
                 Metadata
-                <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection("metadata")}>
+                {accessLevel === "control" && (
+                  <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection("metadata")}>
                   <PlusCircle className="h-3 w-3 mr-1" /> Add Note
                 </Button>
+                )}
               </h2>
                 <Card className="p-6">
                   <div className="space-y-6">
@@ -514,9 +544,11 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
                 <section key={key} id={key} ref={(el) => { sectionRefs.current[key] = el; }} className="space-y-4">
                   <h2 className="text-2xl font-bold tracking-tight capitalize flex items-center">
                       {key.split('_').join(' ')}
+                      {accessLevel === "control" && (
                     <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection(key)}>
                       <PlusCircle className="h-3 w-3 mr-1" /> Add Note
                     </Button>
+                      )}
                     </h2>
                     <Card className="p-6">
                       <SectionEditor
@@ -535,9 +567,10 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
               <section key={`user_field_${field.field_name}`} id={`user_field_${field.field_name}`} ref={(el) => { sectionRefs.current[`user_field_${field.field_name}`] = el; }} className="space-y-4">
                 <h2 className="text-2xl font-bold tracking-tight capitalize flex items-center">
                     {field.field_name}
-                  <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection(`user_field_${field.field_name}`)}>
+                    {accessLevel === "control" && (<Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection(`user_field_${field.field_name}`)}>
                     <PlusCircle className="h-3 w-3 mr-1" /> Add Note
                   </Button>
+                    )}
                   </h2>
                   <Card className="p-6">
                     <SectionEditor
@@ -556,15 +589,18 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
               <section id="images" ref={(el) => { sectionRefs.current['images'] = el; }} className="space-y-4">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center">
                   Images
+                  {accessLevel === "control" && (
                   <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection("images")}>
                     <PlusCircle className="h-3 w-3 mr-1" /> Add Note
                   </Button>
+                  )}
                 </h2>
                     <Card className="p-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {paper.image_urls.map((image: string, index: number) => (
                       <img key={index} src={image} alt={`Paper Image ${index + 1}`} className="w-full h-auto rounded-md" />
                         ))}
+                        
                       </div>
                     </Card>
                   </section>
@@ -575,9 +611,11 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
               <section id="references" ref={(el) => { sectionRefs.current['references'] = el; }} className="space-y-4">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center">
                   References
+                  {accessLevel === "control" && (
                   <Button variant="ghost" size="sm" className="ml-2" onClick={() => handleNoteSelection("references")}>
                     <PlusCircle className="h-3 w-3 mr-1" /> Add Note
                   </Button>
+                  )}
                 </h2>
                   <Card className="p-6">
                     <ul className="space-y-2 list-decimal pl-5">
@@ -603,6 +641,7 @@ const PaperPage = ({ paperId }: { paperId: string }) => {
         </aside>
       </div>
     </div>
+    </>
   );
 };
 
