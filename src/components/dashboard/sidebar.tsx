@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { use } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -8,6 +8,8 @@ import { BarChart3, FileText, FolderOpen, Settings, Search, LogOut, Brain, Menu,
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useSession } from "next-auth/react"
+import { useUser } from "@/hooks/useUser"
+import { useLogout } from "@/hooks/useLogout"
 
 interface SidebarProps {
   className?: string
@@ -17,9 +19,13 @@ export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false)
   const session = useSession()
+  const {user, fetchUser } = useUser()
+  console.log("Session:", fetchUser)
+  console.log("User Profile:", user)
   const userEmail = session.data?.user?.email || ""
-  const userName = session.data?.user?.name || "Username"
-  
+  const userName = user?.name || session.data?.user?.name || ""
+
+  const {logout} = useLogout()
   return (
     <>
       {/* Mobile Sidebar Toggle */}
@@ -96,14 +102,12 @@ export function Sidebar({ className }: SidebarProps) {
           {/* User Section */}
           <div className="border-t p-4">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-sm font-medium">US</span>
-              </div>
+              |
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{userName}</span>
                 <span className="text-xs text-muted-foreground">{userEmail}</span>
               </div>
-              <Button variant="ghost" size="icon" className="ml-auto">
+              <Button variant="ghost" size="icon" className="ml-auto" onClick={() => logout()}>
                 <LogOut className="h-4 w-4" />
                 <span className="sr-only">Log out</span>
               </Button>
